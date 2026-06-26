@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Plus, Edit2, Trash2, Truck, Search, Phone, Mail } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Supplier } from '../types';
+import DeleteConfirmModal from './DeleteConfirmModal';
 
 interface SuppliersProps {
   suppliers: Supplier[];
@@ -13,6 +14,7 @@ interface SuppliersProps {
 export default function Suppliers({ suppliers, onAddSupplier, onUpdateSupplier, onDeleteSupplier }: SuppliersProps) {
   const [isAdding, setIsAdding] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
+  const [itemToDelete, setItemToDelete] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
   const filteredSuppliers = suppliers.filter(s => s.name.toLowerCase().includes(searchTerm.toLowerCase()) || s.contactName.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -137,9 +139,7 @@ export default function Suppliers({ suppliers, onAddSupplier, onUpdateSupplier, 
                                 <Edit2 className="w-4 h-4" />
                             </button>
                             <button
-                                onClick={() => {
-                                    if (window.confirm('¿Eliminar proveedor?')) onDeleteSupplier(supplier.id);
-                                }}
+                                onClick={() => setItemToDelete(supplier.id)}
                                 className="w-8 h-8 rounded-full bg-red-50 hover:bg-red-100 text-red-600 flex items-center justify-center transition-colors cursor-pointer"
                             >
                                 <Trash2 className="w-4 h-4" />
@@ -161,6 +161,17 @@ export default function Suppliers({ suppliers, onAddSupplier, onUpdateSupplier, 
           </div>
         </div>
       </div>
+
+      <DeleteConfirmModal
+        isOpen={!!itemToDelete}
+        title="Eliminar Proveedor"
+        message="¿Está seguro de eliminar este proveedor? Esta acción no se puede deshacer."
+        onConfirm={() => {
+          if (itemToDelete) onDeleteSupplier(itemToDelete);
+          setItemToDelete(null);
+        }}
+        onCancel={() => setItemToDelete(null)}
+      />
     </div>
   );
 }

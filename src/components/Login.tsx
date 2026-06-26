@@ -3,7 +3,7 @@ import { Beef, Lock, User, Loader2 } from 'lucide-react';
 import { useToast } from '../contexts/ToastContext';
 
 interface LoginProps {
-  onLogin: () => void;
+  onLogin: (user: import('../types').Seller) => void;
   sellers: import('../types').Seller[];
 }
 
@@ -21,8 +21,17 @@ export default function Login({ onLogin, sellers }: LoginProps) {
     setTimeout(() => {
       const activeSeller = sellers.find(s => s.status === 'Activo' && s.cedula === cedula && s.password === password);
       
-      if ((cedula === '1234567890' && password === 'admin') || activeSeller) {
-        onLogin();
+      if (cedula === '1234567890' && password === 'admin') {
+        onLogin({
+          id: '1',
+          name: 'Administrador Principal',
+          cedula: '1234567890',
+          phone: '',
+          role: 'Administrador',
+          status: 'Activo'
+        });
+      } else if (activeSeller) {
+        onLogin(activeSeller);
       } else {
         showToast('Credenciales incorrectas', 'error');
         setIsLoading(false);

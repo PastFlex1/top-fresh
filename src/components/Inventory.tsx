@@ -5,6 +5,7 @@ import { Product } from '../types';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import { useToast } from '../contexts/ToastContext';
+import DeleteConfirmModal from './DeleteConfirmModal';
 
 interface InventoryProps {
   products: Product[];
@@ -16,6 +17,7 @@ interface InventoryProps {
 export default function Inventory({ products, onAddProduct, onUpdateProduct, onDeleteProduct }: InventoryProps) {
   const [isAdding, setIsAdding] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [itemToDelete, setItemToDelete] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const { showToast } = useToast();
 
@@ -209,9 +211,7 @@ export default function Inventory({ products, onAddProduct, onUpdateProduct, onD
                             <Edit2 className="w-3.5 h-3.5" />
                           </button>
                           <button
-                            onClick={() => {
-                              if(window.confirm('¿Eliminar este producto?')) onDeleteProduct(product.id);
-                            }}
+                            onClick={() => setItemToDelete(product.id)}
                             className="w-8 h-8 flex items-center justify-center rounded-full bg-white border border-[#e8dfd3] text-[#878077] hover:text-red-600 hover:bg-red-50 hover:border-red-200 transition-colors"
                             title="Eliminar"
                           >
@@ -234,6 +234,17 @@ export default function Inventory({ products, onAddProduct, onUpdateProduct, onD
           </div>
         </div>
       </div>
+
+      <DeleteConfirmModal
+        isOpen={!!itemToDelete}
+        title="Eliminar Producto"
+        message="¿Está seguro de eliminar este producto? Esta acción no se puede deshacer."
+        onConfirm={() => {
+          if (itemToDelete) onDeleteProduct(itemToDelete);
+          setItemToDelete(null);
+        }}
+        onCancel={() => setItemToDelete(null)}
+      />
     </div>
   );
 }

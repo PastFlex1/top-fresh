@@ -5,6 +5,7 @@ import { es } from 'date-fns/locale';
 import { formatInTimeZone } from 'date-fns-tz';
 import { isWithinInterval, startOfDay, endOfDay, parseISO } from 'date-fns';
 import * as XLSX from 'xlsx';
+import DeleteConfirmModal from './DeleteConfirmModal';
 
 interface HistoryProps {
   sales: Sale[];
@@ -18,6 +19,7 @@ export default function History({ sales, onVoidSale }: HistoryProps) {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
+  const [saleToVoid, setSaleToVoid] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
 
   const filteredSales = useMemo(() => {
@@ -322,11 +324,7 @@ export default function History({ sales, onVoidSale }: HistoryProps) {
                 {selectedSale.status !== 'voided' && onVoidSale && (
                   <div className="mt-8 pt-6 border-t border-[#e8dfd3] flex justify-end">
                     <button 
-                      onClick={() => {
-                        if(window.confirm('¿Estás seguro de anular esta nota de venta? El stock será devuelto al inventario.')) {
-                          onVoidSale(selectedSale.id);
-                        }
-                      }}
+                      onClick={() => setSaleToVoid(selectedSale.id)}
                       className="flex items-center gap-2 px-6 py-3 bg-white border-2 border-red-200 text-red-600 rounded-xl font-bold hover:bg-red-50 hover:border-red-300 transition-colors"
                     >
                       <Ban className="w-4 h-4" />
@@ -339,6 +337,17 @@ export default function History({ sales, onVoidSale }: HistoryProps) {
           </div>
         )}
       </div>
+
+      <DeleteConfirmModal
+        isOpen={!!saleToVoid}
+        title="Anular Venta"
+        message="¿Estás seguro de anular esta nota de venta? El stock será devuelto al inventario y esta acción no se puede deshacer."
+        onConfirm={() => {
+          if (saleToVoid && onVoidSale) onVoidSale(saleToVoid);
+          setSaleToVoid(null);
+        }}
+        onCancel={() => setSaleToVoid(null)}
+      />
     </div>
   );
 }

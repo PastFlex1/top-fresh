@@ -32,6 +32,7 @@ const INITIAL_SUPPLIERS: Supplier[] = [];
 export default function App() {
   const { showToast } = useToast();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [currentUser, setCurrentUser] = useState<Seller | null>(null);
   const [activeTab, setActiveTab] = useState<'pos' | 'inventory' | 'dashboard' | 'sellers' | 'history' | 'reports' | 'expenses' | 'suppliers' | 'purchases'>('dashboard');
 
   const navItems = [
@@ -59,9 +60,21 @@ export default function App() {
   // Carga de datos asíncrona simulando una llamada a API
   useEffect(() => {
     let ignore = false;
-    const storedAuth = localStorage.getItem('topfresh_auth');
-    if (storedAuth === 'true') {
+    const storedUser = localStorage.getItem('topfresh_auth_user');
+    if (storedUser) {
+      const user = JSON.parse(storedUser);
+      setCurrentUser(user);
       setIsAuthenticated(true);
+      if (user.role === 'Trabajador') {
+        setActiveTab('pos');
+      }
+    } else {
+      const storedAuth = localStorage.getItem('topfresh_auth');
+      if (storedAuth === 'true') {
+        const adminUser: Seller = { id: '1', name: 'Administrador Principal', cedula: '1234567890', phone: '', role: 'Administrador', status: 'Activo' };
+        setCurrentUser(adminUser);
+        setIsAuthenticated(true);
+      }
     }
 
     const loadData = async () => {
@@ -155,14 +168,22 @@ export default function App() {
     if (isDataLoaded) saveGoals(goals);
   }, [goals, isDataLoaded]);
 
-  const handleLogin = () => {
+  const handleLogin = (user: Seller) => {
+    setCurrentUser(user);
     setIsAuthenticated(true);
-    localStorage.setItem('topfresh_auth', 'true');
-    showToast('Sesión iniciada correctamente', 'success');
+    localStorage.setItem('topfresh_auth_user', JSON.stringify(user));
+    if (user.role === 'Trabajador') {
+      setActiveTab('pos');
+    } else {
+      setActiveTab('dashboard');
+    }
+    showToast(`Bienvenido(a), ${user.name}`, 'success');
   };
 
   const handleLogout = () => {
+    setCurrentUser(null);
     setIsAuthenticated(false);
+    localStorage.removeItem('topfresh_auth_user');
     localStorage.removeItem('topfresh_auth');
     showToast('Sesión cerrada', 'success');
   };
@@ -353,7 +374,7 @@ export default function App() {
           </div>
           
           <nav className="flex items-center gap-2">
-            {navItems.map(item => (
+            {(currentUser?.role === 'Trabajador' ? navItems.filter(item => item.id === 'pos') : navItems).map(item => (
               <button
                 key={item.id}
                 onClick={() => handleTabChange(item.id)}

@@ -6,6 +6,7 @@ import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import { format } from 'date-fns';
 import { useToast } from '../contexts/ToastContext';
+import DeleteConfirmModal from './DeleteConfirmModal';
 
 interface ExpensesProps {
   expenses: Expense[];
@@ -17,6 +18,7 @@ interface ExpensesProps {
 export default function Expenses({ expenses, onAddExpense, onUpdateExpense, onDeleteExpense }: ExpensesProps) {
   const [isAdding, setIsAdding] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
+  const [itemToDelete, setItemToDelete] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const { showToast } = useToast();
 
@@ -134,11 +136,7 @@ export default function Expenses({ expenses, onAddExpense, onUpdateExpense, onDe
                       <Edit2 className="w-4 h-4" />
                     </button>
                     <button
-                      onClick={() => {
-                        if (window.confirm('¿Está seguro de eliminar este gasto?')) {
-                          onDeleteExpense(expense.id);
-                        }
-                      }}
+                      onClick={() => setItemToDelete(expense.id)}
                       className="w-8 h-8 flex items-center justify-center rounded-full bg-white border border-[#e8dfd3] text-red-400 hover:text-red-600 hover:bg-red-50 hover:border-red-100 transition-colors"
                       title="Eliminar"
                     >
@@ -182,6 +180,17 @@ export default function Expenses({ expenses, onAddExpense, onUpdateExpense, onDe
           />
         )}
       </AnimatePresence>
+
+      <DeleteConfirmModal
+        isOpen={!!itemToDelete}
+        title="Eliminar Gasto"
+        message="¿Está seguro de eliminar este gasto? Esta acción no se puede deshacer."
+        onConfirm={() => {
+          if (itemToDelete) onDeleteExpense(itemToDelete);
+          setItemToDelete(null);
+        }}
+        onCancel={() => setItemToDelete(null)}
+      />
     </div>
   );
 }
