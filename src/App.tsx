@@ -56,6 +56,7 @@ export default function App() {
   const [isDataLoaded, setIsDataLoaded] = useState(false);
   const [isNavigating, setIsNavigating] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [showClosingReminder, setShowClosingReminder] = useState(false);
 
   // Carga de datos asíncrona simulando una llamada a API
   useEffect(() => {
@@ -137,6 +138,28 @@ export default function App() {
       ignore = true;
     };
   }, []);
+
+  // Recordatorio de cierre de caja para trabajadores a las 19:00
+  useEffect(() => {
+    if (!isAuthenticated || currentUser?.role !== 'Trabajador') return;
+
+    const checkTime = () => {
+      const now = new Date();
+      // Si son pasadas las 19:00 (7 PM)
+      if (now.getHours() >= 19) {
+        const today = now.toISOString().split('T')[0];
+        const lastReminder = localStorage.getItem('topfresh_closing_reminder_date');
+        if (lastReminder !== today) {
+          setShowClosingReminder(true);
+          localStorage.setItem('topfresh_closing_reminder_date', today);
+        }
+      }
+    };
+
+    checkTime(); // Check immediately
+    const interval = setInterval(checkTime, 60000); // Check every minute
+    return () => clearInterval(interval);
+  }, [isAuthenticated, currentUser]);
 
   // Simulación de guardado asíncrono
   // En una API real, esto se llamaría directamente al crear/editar/eliminar
@@ -434,9 +457,44 @@ export default function App() {
                       }}
                       className="flex-1 py-3 bg-[#e11d48] text-white rounded-xl font-bold hover:bg-red-700 transition-colors"
                     >
-                      Cerrar Sesión
+                      Cerrar sesión
                     </button>
                   </div>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <AnimatePresence>
+            {showClosingReminder && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 bg-[#1c1a17] bg-opacity-40 backdrop-blur-sm z-[99] flex items-center justify-center p-4"
+              >
+                <motion.div
+                  initial={{ scale: 0.8, opacity: 0, y: 20 }}
+                  animate={{ scale: 1, opacity: 1, y: 0 }}
+                  exit={{ scale: 0.8, opacity: 0, y: 20 }}
+                  className="bg-white rounded-3xl shadow-xl w-full max-w-sm p-6 flex flex-col items-center text-center relative overflow-hidden"
+                >
+                  <div className="absolute top-0 left-0 w-full h-2 bg-[#fcaecb]" />
+                  <div className="w-16 h-16 bg-[#fcaecb]/20 rounded-full flex items-center justify-center mb-4">
+                    <Bell className="w-8 h-8 text-[#e11d48]" />
+                  </div>
+                  <h3 className="text-xl font-bold text-[#1c1a17]">¡Recordatorio!</h3>
+                  <p className="text-base text-[#878077] mt-2 mb-6 font-medium">
+                    Ya son las 7 de la noche. <br/>
+                    <strong className="text-[#1c1a17]">No te olvides de cerrar caja</strong>.
+                  </p>
+                  
+                  <button
+                    onClick={() => setShowClosingReminder(false)}
+                    className="w-full py-3 bg-[#1c1a17] text-white rounded-xl font-bold hover:bg-black transition-colors shadow-sm"
+                  >
+                    Entendido
+                  </button>
                 </motion.div>
               </motion.div>
             )}
