@@ -33,7 +33,7 @@ export default function Notifications({ products, purchases }: NotificationsProp
       id: `low-stock-${p.id}`,
       type: 'warning' as const,
       title: 'Stock bajo',
-      message: `${p.name} tiene un stock crítico de ${p.stock} ${p.unit}.`,
+      message: `${p.name} tiene un stock crítico de ${Number(p.stock.toFixed(2))} ${p.unit}.`,
       date: new Date(), // Siempre actual para stock bajo
       isRead: false
     }));

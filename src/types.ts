@@ -33,7 +33,9 @@ export interface Sale {
   total: number;
   items: CartItem[];
   sellerName?: string;
-  paymentMethod?: string;
+  paymentMethod?: 'Efectivo' | 'Transferencia' | string;
+  receiptNumber?: string;
+  isCashRegisterClose?: boolean;
 }
 
 export interface Expense {

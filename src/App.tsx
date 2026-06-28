@@ -374,7 +374,7 @@ export default function App() {
           </div>
           
           <nav className="flex items-center gap-2">
-            {(currentUser?.role === 'Trabajador' ? navItems.filter(item => item.id === 'pos') : navItems).map(item => (
+            {(currentUser?.role === 'Trabajador' ? navItems.filter(item => ['pos', 'history', 'inventory', 'purchases'].includes(item.id)) : navItems).map(item => (
               <button
                 key={item.id}
                 onClick={() => handleTabChange(item.id)}
@@ -465,7 +465,7 @@ export default function App() {
                 transition={{ duration: 0.2 }}
                 className="flex-1 flex flex-col h-full overflow-hidden"
               >
-                {activeTab === 'pos' && <POS products={products} onCompleteSale={handleSaleComplete} />}
+                {activeTab === 'pos' && <POS products={products} onCompleteSale={handleSaleComplete} currentUser={currentUser} sales={sales} />}
                 {activeTab === 'inventory' && (
                   <Inventory
                     products={products}
@@ -507,7 +507,7 @@ export default function App() {
                   />
                 )}
                 {activeTab === 'dashboard' && <Dashboard sales={sales} products={products} goals={goals} setGoals={setGoals} />}
-                {activeTab === 'history' && <History sales={sales} onVoidSale={handleVoidSale} />}
+                {activeTab === 'history' && <History sales={currentUser?.role === 'Trabajador' ? sales.filter(s => s.sellerName === currentUser.name) : sales} onVoidSale={handleVoidSale} />}
                 {activeTab === 'reports' && <Reports sales={sales} products={products} expenses={expenses} />}
               </motion.div>
             )}

@@ -21,6 +21,7 @@ export default function History({ sales, onVoidSale }: HistoryProps) {
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
   const [saleToVoid, setSaleToVoid] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [showOnlyClosures, setShowOnlyClosures] = useState(false);
 
   const filteredSales = useMemo(() => {
     return sales.filter(sale => {
@@ -33,16 +34,19 @@ export default function History({ sales, onVoidSale }: HistoryProps) {
         try {
           const saleDate = new Date(sale.date);
           const start = startDate ? startOfDay(parseISO(startDate)) : new Date(0);
-          const end = endDate ? endOfDay(parseISO(endDate)) : new Date(8640000000000000); // Max date
+          // Si solo hay startDate, endDate asume el final de ese mismo día. Si hay endDate, usa ese.
+          const end = endDate ? endOfDay(parseISO(endDate)) : (startDate ? endOfDay(parseISO(startDate)) : new Date(8640000000000000));
           matchesDateRange = isWithinInterval(saleDate, { start, end });
         } catch (e) {
           // Fallback if parsing fails
         }
       }
 
-      return matchesSearch && matchesDateRange;
+      const matchesType = showOnlyClosures ? sale.isCashRegisterClose === true : true;
+
+      return matchesSearch && matchesDateRange && matchesType;
     }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [sales, searchTerm, startDate, endDate]);
+  }, [sales, searchTerm, startDate, endDate, showOnlyClosures]);
 
   const totalPages = Math.ceil(filteredSales.length / ITEMS_PER_PAGE);
   const currentSales = filteredSales.slice(
@@ -54,7 +58,7 @@ export default function History({ sales, onVoidSale }: HistoryProps) {
   useMemo(() => {
     setCurrentPage(1);
     setSelectedSale(null);
-  }, [searchTerm, startDate, endDate]);
+  }, [searchTerm, startDate, endDate, showOnlyClosures]);
 
   const handleExportExcel = () => {
     if (filteredSales.length === 0) return;
@@ -133,16 +137,25 @@ export default function History({ sales, onVoidSale }: HistoryProps) {
                     placeholder="Buscar vendedor..." 
                     value={searchTerm}
                     onChange={e => setSearchTerm(e.target.value)}
-                    className="pl-9 pr-4 py-2 bg-white border border-[#e8dfd3] rounded-full text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#cbaefc] w-56 transition-all"
+                    className="pl-9 pr-4 py-2 bg-white border border-[#e8dfd3] rounded-full text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#cbaefc] w-48 transition-all"
                   />
                 </div>
+                <label className="flex items-center gap-2 cursor-pointer bg-white border border-[#e8dfd3] px-3 py-2 rounded-full hover:bg-gray-50 transition-colors">
+                  <input 
+                    type="checkbox" 
+                    checked={showOnlyClosures}
+                    onChange={(e) => setShowOnlyClosures(e.target.checked)}
+                    className="accent-[#cbaefc] w-4 h-4 cursor-pointer"
+                  />
+                  <span className="text-sm font-semibold text-[#1c1a17]">Solo cierres</span>
+                </label>
                 <button
                   onClick={handleExportExcel}
                   disabled={filteredSales.length === 0}
                   className="flex items-center gap-2 bg-[#1c1a17] text-white px-4 py-2 rounded-full text-sm font-semibold hover:bg-black transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Download className="w-4 h-4" />
-                  <span>Excel</span>
+                  <span className="hidden sm:inline">Excel</span>
                 </button>
             </div>
         </div>
@@ -174,8 +187,9 @@ export default function History({ sales, onVoidSale }: HistoryProps) {
                       }`}
                     >
                       <div className="flex justify-between items-start mb-3">
-                        <div className={`px-2.5 py-1 rounded-md text-xs font-bold tracking-widest ${isSelected ? 'bg-white/20 text-white' : 'bg-[#f0e8dd] text-[#1c1a17]'}`}>
+                        <div className={`px-2.5 py-1 rounded-md text-xs font-bold tracking-widest flex items-center gap-2 ${isSelected ? 'bg-white/20 text-white' : 'bg-[#f0e8dd] text-[#1c1a17]'}`}>
                           {sale.sequenceNumber !== undefined ? `#${String(sale.sequenceNumber).padStart(6, '0')}` : `#${sale.id.substring(0,6).toUpperCase()}`}
+                          {sale.isCashRegisterClose && <span className="bg-[#1c1a17] text-white px-1.5 py-0.5 rounded-[4px] text-[9px] uppercase">CIERRE</span>}
                         </div>
                         <div className="flex flex-col items-end gap-1">
                           <span className={`font-black text-lg leading-none ${sale.status === 'voided' ? 'line-through opacity-50' : ''}`}>
@@ -251,7 +265,9 @@ export default function History({ sales, onVoidSale }: HistoryProps) {
                   <div className="w-16 h-16 bg-[#f0e8dd] rounded-full flex items-center justify-center mx-auto mb-4">
                     <Receipt className="w-8 h-8 text-[#1c1a17]" />
                   </div>
-                  <h2 className="text-2xl font-black text-[#1c1a17] mb-1">Nota de Venta</h2>
+                  <h2 className="text-2xl font-black text-[#1c1a17] mb-1">
+                    {selectedSale.isCashRegisterClose ? 'Cierre de Caja' : 'Nota de Venta'}
+                  </h2>
                   <div className="flex items-center justify-center gap-2 mb-3">
                     <div className="inline-block bg-[#1c1a17] text-white px-3 py-1 rounded-full text-sm font-bold tracking-widest">
                       {selectedSale.sequenceNumber !== undefined ? `#${String(selectedSale.sequenceNumber).padStart(6, '0')}` : `#${selectedSale.id.substring(0,6).toUpperCase()}`}
@@ -281,7 +297,10 @@ export default function History({ sales, onVoidSale }: HistoryProps) {
                       <FileText className="w-4 h-4" />
                       <span className="text-xs font-bold uppercase tracking-wider">Método de Pago</span>
                     </div>
-                    <p className="font-bold text-[#1c1a17]">{selectedSale.paymentMethod || 'Efectivo'}</p>
+                    <p className="font-bold text-[#1c1a17]">
+                      {selectedSale.paymentMethod || 'Efectivo'}
+                      {selectedSale.receiptNumber && <span className="block text-xs font-medium text-[#878077] mt-0.5">Ref: {selectedSale.receiptNumber}</span>}
+                    </p>
                   </div>
                 </div>
 
