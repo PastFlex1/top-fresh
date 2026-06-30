@@ -1,20 +1,28 @@
 import React, { useState } from 'react';
+import { formatInTimeZone } from 'date-fns-tz';
 import { ShoppingCart, Plus, Trash2, Receipt, Search, AlertCircle, X, Check, Lock } from 'lucide-react';
-import { Product, CartItem, Sale, Seller } from '../types';
+import { Product, CartItem, Sale, Seller, Closure } from '../types';
 
 interface POSProps {
   products: Product[];
   sales?: Sale[];
   currentUser?: Seller | null;
   onCompleteSale: (sale: Sale) => void;
+  onCompleteClosure: (closure: Closure) => void;
 }
 
-export default function POS({ products, onCompleteSale, sales = [], currentUser = null }: POSProps) {
+export default function POS({ products, onCompleteSale, onCompleteClosure, sales = [], currentUser = null }: POSProps) {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<'Efectivo' | 'Transferencia'>('Efectivo');
   const [receiptNumber, setReceiptNumber] = useState('');
+  
+  const [isClosingModalOpen, setIsClosingModalOpen] = useState(false);
+  const [realCashInput, setRealCashInput] = useState('');
+  const [realTransferInput, setRealTransferInput] = useState('');
+  const [calculatedCash, setCalculatedCash] = useState(0);
+  const [calculatedTransfer, setCalculatedTransfer] = useState(0);
 
   const filteredProducts = products.filter(p =>
     p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -77,21 +85,31 @@ export default function POS({ products, onCompleteSale, sales = [], currentUser 
       total: cart.reduce((sum, item) => sum + item.subtotal, 0),
       sellerName: currentUser?.name || 'Sistema',
       paymentMethod,
-      receiptNumber: paymentMethod === 'Transferencia' ? receiptNumber : undefined,
     };
+    if (paymentMethod === 'Transferencia') {
+      newSale.receiptNumber = receiptNumber;
+    }
     onCompleteSale(newSale);
     setCart([]);
     setReceiptNumber('');
   };
 
   const handleCashRegisterClose = () => {
-    const today = new Date().toISOString().split('T')[0];
-    const todaysSales = sales.filter(s => 
-      s.sellerName === (currentUser?.name || 'Sistema') && 
-      s.date.startsWith(today) && 
-      s.status !== 'voided' && 
-      !s.isCashRegisterClose
-    );
+    const ecuadorTimeZone = 'America/Guayaquil';
+    const today = formatInTimeZone(new Date(), ecuadorTimeZone, 'yyyy-MM-dd');
+    
+    const todaysSales = sales.filter(s => {
+      try {
+        const saleDate = formatInTimeZone(new Date(s.date), ecuadorTimeZone, 'yyyy-MM-dd');
+        return (
+          saleDate === today && 
+          s.status !== 'voided' && 
+          !s.isCashRegisterClose
+        );
+      } catch (e) {
+        return false;
+      }
+    });
     
     if (todaysSales.length === 0) {
       setToastMessage('No hay ventas hoy para cerrar caja.');
@@ -101,22 +119,46 @@ export default function POS({ products, onCompleteSale, sales = [], currentUser 
 
     const totalCash = todaysSales.filter(s => s.paymentMethod === 'Efectivo' || !s.paymentMethod).reduce((sum, s) => sum + s.total, 0);
     const totalTransfer = todaysSales.filter(s => s.paymentMethod === 'Transferencia').reduce((sum, s) => sum + s.total, 0);
-    const total = totalCash + totalTransfer;
 
-    const closeSale: Sale = {
+    setCalculatedCash(totalCash);
+    setCalculatedTransfer(totalTransfer);
+    setRealCashInput('');
+    setRealTransferInput('');
+    setIsClosingModalOpen(true);
+  };
+
+  const handleConfirmClosure = () => {
+    const realCash = parseFloat(realCashInput) || 0;
+    const realTransfer = parseFloat(realTransferInput) || 0;
+    const realTotal = realCash + realTransfer;
+    const systemTotal = calculatedCash + calculatedTransfer;
+    const difference = realTotal - systemTotal;
+
+    // Determine status
+    let status: 'exact' | 'warning' | 'mismatch' = 'exact';
+    const absDiff = Math.abs(difference);
+    if (absDiff > 0 && absDiff <= 2) {
+      status = 'warning';
+    } else if (absDiff > 2) {
+      status = 'mismatch';
+    }
+
+    const closure: Closure = {
       id: Math.random().toString(36).substr(2, 9),
       date: new Date().toISOString(),
-      items: [
-         { productId: 'cash', productName: 'Total Efectivo', price: totalCash, cost: 0, quantity: 1, unit: 'ud', subtotal: totalCash },
-         { productId: 'transfer', productName: 'Total Transferencias', price: totalTransfer, cost: 0, quantity: 1, unit: 'ud', subtotal: totalTransfer },
-      ],
-      total,
       sellerName: currentUser?.name || 'Sistema',
-      isCashRegisterClose: true
+      systemCash: calculatedCash,
+      systemTransfer: calculatedTransfer,
+      systemTotal,
+      realCash,
+      realTransfer,
+      realTotal,
+      difference,
+      status
     };
-    onCompleteSale(closeSale);
-    setToastMessage('Cierre de caja generado con éxito.');
-    setTimeout(() => setToastMessage(null), 4000);
+
+    onCompleteClosure(closure);
+    setIsClosingModalOpen(false);
   };
 
   const total = cart.reduce((sum, item) => sum + item.subtotal, 0);
@@ -284,6 +326,121 @@ export default function POS({ products, onCompleteSale, sales = [], currentUser 
           >
             <X className="w-4 h-4" />
           </button>
+        </div>
+      )}
+
+      {/* Modal de Cierre de Caja con Cuadre */}
+      {isClosingModalOpen && (
+        <div className="fixed inset-0 bg-[#1c1a17] bg-opacity-40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl border border-[#e8dfd3] shadow-2xl w-full max-w-lg p-6 animate-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center pb-4 mb-4 border-b border-[#e8dfd3]">
+              <h2 className="text-xl font-black text-[#1c1a17] flex items-center gap-2">
+                <Lock className="w-5 h-5 text-[#cbaefc]" />
+                Cuadre de Cierre de Caja
+              </h2>
+              <button 
+                onClick={() => setIsClosingModalOpen(false)} 
+                className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-gray-100 transition-colors"
+              >
+                <X className="w-4 h-4 text-[#878077]" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Resumen del Sistema */}
+              <div className="bg-[#fcfaf7] rounded-2xl p-4 border border-[#e8dfd3]">
+                <h3 className="font-bold text-xs uppercase tracking-wider text-[#878077] mb-3">Ventas Calculadas por el Sistema</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <span className="block text-xs font-semibold text-[#878077]">Efectivo Esperado</span>
+                    <span className="text-lg font-extrabold text-[#1c1a17] font-mono">${calculatedCash.toFixed(2)}</span>
+                  </div>
+                  <div>
+                    <span className="block text-xs font-semibold text-[#878077]">Transferencias Esperadas</span>
+                    <span className="text-lg font-extrabold text-[#1c1a17] font-mono">${calculatedTransfer.toFixed(2)}</span>
+                  </div>
+                </div>
+                <div className="mt-3 pt-3 border-t border-dashed border-[#e8dfd3] flex justify-between items-center">
+                  <span className="text-xs font-bold uppercase text-[#1c1a17]">Total en Sistema</span>
+                  <span className="text-xl font-black text-[#1c1a17] font-mono">${(calculatedCash + calculatedTransfer).toFixed(2)}</span>
+                </div>
+              </div>
+
+              {/* Entradas del Usuario */}
+              <div className="space-y-3">
+                <h3 className="font-bold text-xs uppercase tracking-wider text-[#878077]">Monto Real en Caja / Banco</h3>
+                <div>
+                  <label className="block text-xs font-bold text-[#1c1a17] mb-1">Efectivo Físico en Caja ($)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={realCashInput}
+                    onChange={(e) => setRealCashInput(e.target.value)}
+                    className="w-full bg-[#fcfaf7] border border-[#e8dfd3] rounded-xl px-4 py-2.5 text-sm font-mono font-bold focus:outline-none focus:ring-2 focus:ring-[#cbaefc]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-[#1c1a17] mb-1">Transferencias Reales en Banco ($)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={realTransferInput}
+                    onChange={(e) => setRealTransferInput(e.target.value)}
+                    className="w-full bg-[#fcfaf7] border border-[#e8dfd3] rounded-xl px-4 py-2.5 text-sm font-mono font-bold focus:outline-none focus:ring-2 focus:ring-[#cbaefc]"
+                  />
+                </div>
+              </div>
+
+              {/* Diferencia y Cuadre */}
+              {(() => {
+                const rCash = parseFloat(realCashInput) || 0;
+                const rTransfer = parseFloat(realTransferInput) || 0;
+                const rTotal = rCash + rTransfer;
+                const sTotal = calculatedCash + calculatedTransfer;
+                const diff = rTotal - sTotal;
+
+                let badgeColor = 'bg-green-50 text-green-700 border-green-200';
+                let statusText = 'Caja Cuadrada (Monto Exacto)';
+                const absDiff = Math.abs(diff);
+
+                if (absDiff > 0 && absDiff <= 2) {
+                  badgeColor = 'bg-yellow-50 text-yellow-700 border-yellow-200';
+                  statusText = `Diferencia de Tolerancia ($${diff.toFixed(2)})`;
+                } else if (absDiff > 2) {
+                  badgeColor = 'bg-red-50 text-red-700 border-red-200';
+                  statusText = `Descuadre de Caja ($${diff.toFixed(2)})`;
+                }
+
+                return (
+                  <div className={`p-4 rounded-2xl border ${badgeColor} flex flex-col items-center justify-center text-center transition-all`}>
+                    <span className="text-[10px] font-bold uppercase tracking-wider mb-1">Resultado del Cuadre</span>
+                    <span className="text-sm font-black uppercase leading-tight mb-1">{statusText}</span>
+                    <div className="flex gap-4 text-xs font-bold mt-1 opacity-90">
+                      <span>Total Real: <span className="font-mono">${rTotal.toFixed(2)}</span></span>
+                      <span>Diferencia: <span className="font-mono">${diff >= 0 ? '+' : ''}${diff.toFixed(2)}</span></span>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              <div className="pt-4 flex gap-3">
+                <button
+                  onClick={() => setIsClosingModalOpen(false)}
+                  className="flex-1 bg-white border border-[#e8dfd3] hover:bg-[#fcfaf7] text-[#878077] font-bold py-3 rounded-2xl transition-colors text-sm cursor-pointer"
+                >
+                  CANCELAR
+                </button>
+                <button
+                  onClick={handleConfirmClosure}
+                  className="flex-1 bg-[#1c1a17] hover:bg-black text-white font-bold py-3 rounded-2xl transition-colors text-sm cursor-pointer"
+                >
+                  CONFIRMAR CIERRE
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

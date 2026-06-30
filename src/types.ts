@@ -81,3 +81,18 @@ export interface Purchase {
   total: number;
   items: PurchaseItem[];
 }
+
+export interface Closure {
+  id: string;
+  sequenceNumber?: number;
+  date: string;
+  sellerName: string;
+  systemCash: number;
+  systemTransfer: number;
+  systemTotal: number;
+  realCash: number;
+  realTransfer: number;
+  realTotal: number;
+  difference: number;
+  status: 'exact' | 'warning' | 'mismatch';
+}

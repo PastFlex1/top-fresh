@@ -20,7 +20,7 @@ export default function Reports({ sales, products, expenses }: ReportsProps) {
   const [endDate, setEndDate] = useState(() => format(endOfMonth(new Date()), 'yyyy-MM-dd'));
   const { showToast } = useToast();
 
-  const activeSales = useMemo(() => sales.filter(s => s.status !== 'voided'), [sales]);
+  const activeSales = useMemo(() => sales.filter(s => s.status !== 'voided' && !s.isCashRegisterClose), [sales]);
 
   const filteredSales = useMemo(() => {
     let start = new Date(0);

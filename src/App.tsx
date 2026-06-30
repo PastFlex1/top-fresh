@@ -4,21 +4,28 @@
  */
 
 import { useState, useEffect } from 'react';
+import { formatInTimeZone } from 'date-fns-tz';
 import { Beef, Search, Bell, User, Home, Mail, ShoppingCart, Store, FileText, LayoutDashboard, History as HistoryIcon, BarChart, Loader2 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
-import { Goal, Product, Sale, Seller, Expense, Supplier, Purchase } from './types';
+import { Goal, Product, Sale, Seller, Expense, Supplier, Purchase, Closure } from './types';
 import POS from './components/POS';
 import Inventory from './components/Inventory';
 import Dashboard from './components/Dashboard';
 import Login from './components/Login';
 import Sellers from './components/Sellers';
 import History from './components/History';
+import Closures from './components/Closures';
 import Reports from './components/Reports';
 import Expenses from './components/Expenses';
 import Suppliers from './components/Suppliers';
 import Purchases from './components/Purchases';
 import Notifications from './components/Notifications';
-import { getProducts, getSales, getSellers, getExpenses, getSuppliers, getPurchases, getGoals, saveProducts, saveSales, saveSellers, saveExpenses, saveSuppliers, savePurchases, saveGoals } from './services/api';
+import {
+  getProducts, getSales, getSellers, getExpenses, getSuppliers, getPurchases, getGoals,
+  saveProduct, deleteProduct, saveSale, saveSeller, deleteSeller, saveExpense, deleteExpense,
+  saveSupplier, deleteSupplier, savePurchase, saveGoal, saveGoals, hasLocalData, migrateLocalToFirestore,
+  saveProducts, saveSellers, saveSuppliers, getClosures, saveClosure, deleteSale
+} from './services/api';
 import { useToast } from './contexts/ToastContext';
 
 const INITIAL_PRODUCTS: Product[] = [];
@@ -33,12 +40,13 @@ export default function App() {
   const { showToast } = useToast();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentUser, setCurrentUser] = useState<Seller | null>(null);
-  const [activeTab, setActiveTab] = useState<'pos' | 'inventory' | 'dashboard' | 'sellers' | 'history' | 'reports' | 'expenses' | 'suppliers' | 'purchases'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'pos' | 'inventory' | 'dashboard' | 'sellers' | 'history' | 'closures' | 'reports' | 'expenses' | 'suppliers' | 'purchases'>('dashboard');
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard' as const },
     { id: 'pos', label: 'Ventas' as const },
     { id: 'history', label: 'Historial' as const },
+    { id: 'closures', label: 'Cierres' as const },
     { id: 'inventory', label: 'Inventario' as const },
     { id: 'purchases', label: 'Ingresos' as const },
     { id: 'sellers', label: 'Trabajadores' as const },
@@ -53,10 +61,13 @@ export default function App() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
+  const [closures, setClosures] = useState<Closure[]>([]);
   const [isDataLoaded, setIsDataLoaded] = useState(false);
   const [isNavigating, setIsNavigating] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [showClosingReminder, setShowClosingReminder] = useState(false);
+  const [showMigrationBanner, setShowMigrationBanner] = useState(false);
+  const [isMigrating, setIsMigrating] = useState(false);
 
   // Carga de datos asíncrona simulando una llamada a API
   useEffect(() => {
@@ -80,14 +91,15 @@ export default function App() {
 
     const loadData = async () => {
       try {
-        const [fetchedProducts, fetchedSales, fetchedSellers, fetchedExpenses, fetchedSuppliers, fetchedPurchases, fetchedGoals] = await Promise.all([
+        const [fetchedProducts, fetchedSales, fetchedSellers, fetchedExpenses, fetchedSuppliers, fetchedPurchases, fetchedGoals, fetchedClosures] = await Promise.all([
           getProducts(),
           getSales(),
           getSellers(),
           getExpenses(),
           getSuppliers(),
           getPurchases(),
-          getGoals()
+          getGoals(),
+          getClosures()
         ]);
 
         if (ignore) return;
@@ -105,7 +117,51 @@ export default function App() {
           await saveProducts(INITIAL_PRODUCTS); // Inicializar DB
         }
 
-        setSales(fetchedSales);
+        // Helper para mapear cierres antiguos al nuevo formato Closure
+        const mapSaleToClosure = (sale: any): Closure => {
+          if (sale.systemTotal !== undefined && sale.realTotal !== undefined) {
+            return sale as Closure;
+          }
+          const systemCash = sale.items?.find((i: any) => i.productName === 'Total Efectivo' || i.productId === 'cash')?.price ?? sale.total;
+          const systemTransfer = sale.items?.find((i: any) => i.productName === 'Total Transferencias' || i.productId === 'transfer')?.price ?? 0;
+          const systemTotal = sale.total ?? (systemCash + systemTransfer);
+          return {
+            id: sale.id,
+            date: sale.date,
+            sellerName: sale.sellerName || 'Sistema',
+            systemCash,
+            systemTransfer,
+            systemTotal,
+            realCash: systemCash,
+            realTransfer: systemTransfer,
+            realTotal: systemTotal,
+            difference: 0,
+            status: 'exact'
+          };
+        };
+
+        // Migración automática de cierres antiguos guardados en la colección 'sales'
+        const cleanSales: Sale[] = [];
+        const migratedClosures: Closure[] = fetchedClosures.map(mapSaleToClosure);
+        
+        for (const sale of fetchedSales) {
+          if (sale.isCashRegisterClose) {
+            try {
+              const mapped = mapSaleToClosure(sale);
+              await saveClosure(mapped);
+              await deleteSale(sale.id);
+              migratedClosures.push(mapped);
+            } catch (err) {
+              console.error("Error migrando cierre antiguo:", sale.id, err);
+              cleanSales.push(sale);
+            }
+          } else {
+            cleanSales.push(sale);
+          }
+        }
+
+        setSales(cleanSales);
+        setClosures(migratedClosures);
         
         if (fetchedSellers.length > 0) {
           setSellers(fetchedSellers);
@@ -126,6 +182,9 @@ export default function App() {
         setPurchases(fetchedPurchases);
         setGoals(fetchedGoals);
 
+        if (hasLocalData()) {
+          setShowMigrationBanner(true);
+        }
       } catch (error) {
         console.error("Error cargando base de datos", error);
       } finally {
@@ -145,9 +204,12 @@ export default function App() {
 
     const checkTime = () => {
       const now = new Date();
-      // Si son pasadas las 19:00 (7 PM)
-      if (now.getHours() >= 19) {
-        const today = now.toISOString().split('T')[0];
+      const ecuadorTimeZone = 'America/Guayaquil';
+      const localHourStr = formatInTimeZone(now, ecuadorTimeZone, 'H');
+      const localHour = parseInt(localHourStr, 10);
+      
+      if (localHour >= 19) {
+        const today = formatInTimeZone(now, ecuadorTimeZone, 'yyyy-MM-dd');
         const lastReminder = localStorage.getItem('topfresh_closing_reminder_date');
         if (lastReminder !== today) {
           setShowClosingReminder(true);
@@ -161,35 +223,7 @@ export default function App() {
     return () => clearInterval(interval);
   }, [isAuthenticated, currentUser]);
 
-  // Simulación de guardado asíncrono
-  // En una API real, esto se llamaría directamente al crear/editar/eliminar
-  useEffect(() => {
-    if (isDataLoaded) saveProducts(products);
-  }, [products, isDataLoaded]);
 
-  useEffect(() => {
-    if (isDataLoaded) saveSales(sales);
-  }, [sales, isDataLoaded]);
-
-  useEffect(() => {
-    if (isDataLoaded) saveSellers(sellers);
-  }, [sellers, isDataLoaded]);
-
-  useEffect(() => {
-    if (isDataLoaded) saveExpenses(expenses);
-  }, [expenses, isDataLoaded]);
-
-  useEffect(() => {
-    if (isDataLoaded) saveSuppliers(suppliers);
-  }, [suppliers, isDataLoaded]);
-
-  useEffect(() => {
-    if (isDataLoaded) savePurchases(purchases);
-  }, [purchases, isDataLoaded]);
-
-  useEffect(() => {
-    if (isDataLoaded) saveGoals(goals);
-  }, [goals, isDataLoaded]);
 
   const handleLogin = (user: Seller) => {
     setCurrentUser(user);
@@ -220,114 +254,325 @@ export default function App() {
     }, 400); // Simulated network load for modules
   };
 
-  const handleSaleComplete = (sale: Sale) => {
-    const maxSequence = sales.reduce((max, s) => Math.max(max, s.sequenceNumber ?? -1), -1);
-    const finalSale = { ...sale, sequenceNumber: maxSequence + 1, status: 'completed' as const };
-    setSales([finalSale, ...sales]);
-    // Reduce stock
-    const newProducts = products.map(p => {
-      const item = sale.items.find(i => i.productId === p.id);
-      if (item) {
-        return { ...p, stock: Math.max(0, p.stock - item.quantity) };
-      }
-      return p;
-    });
-    setProducts(newProducts);
-    showToast('Venta completada con éxito', 'success');
-
-    // Notify if stock gets low
-    sale.items.forEach(item => {
-      const originalProduct = products.find(p => p.id === item.productId);
-      const newProduct = newProducts.find(p => p.id === item.productId);
-      if (originalProduct && newProduct && originalProduct.stock > 10 && newProduct.stock <= 10) {
-        showToast(`Stock bajo: ${newProduct.name} (${newProduct.stock} ${newProduct.unit})`, 'warning');
-      }
-    });
+  const handleUpdateGoals = async (newGoals: Goal[]) => {
+    try {
+      await saveGoals(newGoals);
+      setGoals(newGoals);
+      showToast('Meta mensual actualizada correctamente', 'success');
+    } catch (e) {
+      showToast('Error al actualizar la meta en la nube', 'error');
+    }
   };
 
-  const handleVoidSale = (saleId: string) => {
+  const handleExportBackup = () => {
+    try {
+      const backupData: Record<string, any> = {};
+      const keys = [
+        'topfresh_products',
+        'topfresh_sales',
+        'topfresh_sellers',
+        'topfresh_expenses',
+        'topfresh_suppliers',
+        'topfresh_purchases',
+        'topfresh_goals'
+      ];
+      keys.forEach(key => {
+        const val = localStorage.getItem(key);
+        if (val) {
+          try {
+            backupData[key] = JSON.parse(val);
+          } catch (e) {
+            backupData[key] = val;
+          }
+        }
+      });
+
+      const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `topfresh_respaldo_local_${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast('Respaldo JSON descargado con éxito', 'success');
+    } catch (error) {
+      showToast('Error al exportar el respaldo local', 'error');
+    }
+  };
+
+  const handleMigrateData = async () => {
+    setIsMigrating(true);
+    showToast('Iniciando sincronización con la nube...', 'info');
+    try {
+      const result = await migrateLocalToFirestore();
+      if (result.success) {
+        // Recargar los datos desde Firestore después de la migración para actualizar la UI
+        const [fetchedProducts, fetchedSales, fetchedSellers, fetchedExpenses, fetchedSuppliers, fetchedPurchases, fetchedGoals] = await Promise.all([
+          getProducts(),
+          getSales(),
+          getSellers(),
+          getExpenses(),
+          getSuppliers(),
+          getPurchases(),
+          getGoals()
+        ]);
+        
+        setProducts(fetchedProducts);
+        setSales(fetchedSales);
+        setSellers(fetchedSellers);
+        setExpenses(fetchedExpenses);
+        setSuppliers(fetchedSuppliers);
+        setPurchases(fetchedPurchases);
+        setGoals(fetchedGoals);
+
+        setShowMigrationBanner(false);
+        showToast('¡Datos migrados a la nube con éxito!', 'success');
+      } else {
+        showToast('Error en la migración a la nube', 'error');
+      }
+    } catch (error) {
+      console.error("Migration error:", error);
+      showToast('Error inesperado durante la migración', 'error');
+    } finally {
+      setIsMigrating(false);
+    }
+  };
+
+  const handleSaleComplete = async (sale: Sale) => {
+    const maxSequence = sales.reduce((max, s) => Math.max(max, s.sequenceNumber ?? -1), -1);
+    const finalSale = { ...sale, sequenceNumber: maxSequence + 1, status: 'completed' as const };
+    
+    try {
+      await saveSale(finalSale);
+      
+      // Reduce stock
+      const newProducts = products.map(p => {
+        const item = sale.items.find(i => i.productId === p.id);
+        if (item) {
+          return { ...p, stock: Math.max(0, p.stock - item.quantity) };
+        }
+        return p;
+      });
+
+      // Update changed products stock in Firestore
+      for (const item of sale.items) {
+        const updatedProd = newProducts.find(p => p.id === item.productId);
+        if (updatedProd) {
+          await saveProduct(updatedProd);
+        }
+      }
+
+      setSales([finalSale, ...sales]);
+      setProducts(newProducts);
+      showToast('Venta completada con éxito', 'success');
+
+      // Notify if stock gets low
+      sale.items.forEach(item => {
+        const originalProduct = products.find(p => p.id === item.productId);
+        const newProduct = newProducts.find(p => p.id === item.productId);
+        if (originalProduct && newProduct && originalProduct.stock > 10 && newProduct.stock <= 10) {
+          showToast(`Stock bajo: ${newProduct.name} (${newProduct.stock} ${newProduct.unit})`, 'warning');
+        }
+      });
+    } catch (e) {
+      showToast('Error al registrar la venta en la nube', 'error');
+    }
+  };
+
+  const handleClosureComplete = async (closure: Closure) => {
+    const maxSequence = closures.reduce((max, c) => Math.max(max, c.sequenceNumber ?? -1), -1);
+    const finalClosure = { ...closure, sequenceNumber: maxSequence + 1 };
+
+    try {
+      await saveClosure(finalClosure);
+      setClosures([finalClosure, ...closures]);
+      showToast('Cierre de caja generado con éxito', 'success');
+    } catch (error) {
+      console.error("Error guardando cierre:", error);
+      showToast('Error al registrar el cierre de caja en la nube', 'error');
+    }
+  };
+
+  const handleVoidSale = async (saleId: string) => {
     const saleToVoid = sales.find(s => s.id === saleId);
     if (!saleToVoid || saleToVoid.status === 'voided') return;
 
-    // Return stock
-    const newProducts = products.map(p => {
-      const item = saleToVoid.items.find(i => i.productId === p.id);
-      if (item) {
-        return { ...p, stock: p.stock + item.quantity };
+    try {
+      const updatedSale = { ...saleToVoid, status: 'voided' as const };
+      await saveSale(updatedSale);
+
+      // Return stock
+      const newProducts = products.map(p => {
+        const item = saleToVoid.items.find(i => i.productId === p.id);
+        if (item) {
+          return { ...p, stock: p.stock + item.quantity };
+        }
+        return p;
+      });
+
+      // Update products stock in Firestore
+      for (const item of saleToVoid.items) {
+        const updatedProd = newProducts.find(p => p.id === item.productId);
+        if (updatedProd) {
+          await saveProduct(updatedProd);
+        }
       }
-      return p;
-    });
-    setProducts(newProducts);
 
-    // Update sale status
-    setSales(sales.map(s => s.id === saleId ? { ...s, status: 'voided' } : s));
-    showToast('Venta anulada correctamente', 'warning');
+      setProducts(newProducts);
+      setSales(sales.map(s => s.id === saleId ? updatedSale : s));
+      showToast('Venta anulada correctamente', 'warning');
+    } catch (e) {
+      showToast('Error al anular la venta en la nube', 'error');
+    }
   };
 
-  const handleAddProduct = (product: Product) => {
-    setProducts([...products, product]);
-    showToast('Producto agregado con éxito', 'success');
+  const handleAddProduct = async (product: Product) => {
+    try {
+      await saveProduct(product);
+      setProducts([...products, product]);
+      showToast('Producto agregado con éxito', 'success');
+    } catch (e) {
+      showToast('Error al agregar el producto a la nube', 'error');
+    }
   };
 
-  const handleUpdateProduct = (updatedProduct: Product) => {
-    setProducts(products.map(p => p.id === updatedProduct.id ? updatedProduct : p));
-    showToast('Producto actualizado con éxito', 'success');
+  const handleImportProducts = async (importedProducts: Product[]) => {
+    try {
+      await saveProducts(importedProducts);
+      setProducts([...products, ...importedProducts]);
+      showToast(`Se importaron ${importedProducts.length} productos con éxito`, 'success');
+    } catch (e) {
+      showToast('Error al guardar los productos importados en la nube', 'error');
+    }
   };
 
-  const handleDeleteProduct = (id: string) => {
-    setProducts(products.filter(p => p.id !== id));
-    showToast('Producto eliminado', 'success');
+  const handleUpdateProduct = async (updatedProduct: Product) => {
+    try {
+      await saveProduct(updatedProduct);
+      setProducts(products.map(p => p.id === updatedProduct.id ? updatedProduct : p));
+      showToast('Producto actualizado con éxito', 'success');
+    } catch (e) {
+      showToast('Error al actualizar el producto en la nube', 'error');
+    }
   };
 
-  const handleAddSeller = (seller: Seller) => {
-    setSellers([...sellers, seller]);
-    showToast('Trabajador registrado con éxito', 'success');
+  const handleDeleteProduct = async (id: string) => {
+    try {
+      await deleteProduct(id);
+      setProducts(products.filter(p => p.id !== id));
+      showToast('Producto eliminado', 'success');
+    } catch (e) {
+      showToast('Error al eliminar el producto en la nube', 'error');
+    }
   };
 
-  const handleUpdateSeller = (updatedSeller: Seller) => {
-    setSellers(sellers.map(s => s.id === updatedSeller.id ? updatedSeller : s));
-    showToast('Datos del trabajador actualizados', 'success');
+  const handleAddSeller = async (seller: Seller) => {
+    try {
+      await saveSeller(seller);
+      setSellers([...sellers, seller]);
+      showToast('Trabajador registrado con éxito', 'success');
+    } catch (e) {
+      showToast('Error al registrar el trabajador en la nube', 'error');
+    }
   };
 
-  const handleDeleteSeller = (id: string) => {
-    setSellers(sellers.filter(s => s.id !== id));
-    showToast('Trabajador eliminado', 'success');
+  const handleUpdateSeller = async (updatedSeller: Seller) => {
+    try {
+      await saveSeller(updatedSeller);
+      setSellers(sellers.map(s => s.id === updatedSeller.id ? updatedSeller : s));
+      showToast('Datos del trabajador actualizados', 'success');
+    } catch (e) {
+      showToast('Error al actualizar el trabajador en la nube', 'error');
+    }
   };
 
-  const handleAddExpense = (expense: Expense) => {
-    setExpenses([...expenses, expense]);
-    showToast('Gasto registrado exitosamente', 'success');
+  const handleDeleteSeller = async (id: string) => {
+    try {
+      await deleteSeller(id);
+      setSellers(sellers.filter(s => s.id !== id));
+      showToast('Trabajador eliminado', 'success');
+    } catch (e) {
+      showToast('Error al eliminar el trabajador en la nube', 'error');
+    }
   };
 
-  const handleUpdateExpense = (updatedExpense: Expense) => {
-    setExpenses(expenses.map(e => e.id === updatedExpense.id ? updatedExpense : e));
-    showToast('Gasto actualizado', 'success');
+  const handleAddExpense = async (expense: Expense) => {
+    try {
+      await saveExpense(expense);
+      setExpenses([...expenses, expense]);
+      showToast('Gasto registrado exitosamente', 'success');
+    } catch (e) {
+      showToast('Error al registrar el gasto en la nube', 'error');
+    }
   };
 
-  const handleDeleteExpense = (id: string) => {
-    setExpenses(expenses.filter(e => e.id !== id));
-    showToast('Gasto eliminado', 'success');
+  const handleUpdateExpense = async (updatedExpense: Expense) => {
+    try {
+      await saveExpense(updatedExpense);
+      setExpenses(expenses.map(e => e.id === updatedExpense.id ? updatedExpense : e));
+      showToast('Gasto actualizado', 'success');
+    } catch (e) {
+      showToast('Error al actualizar el gasto en la nube', 'error');
+    }
   };
 
-  const handleAddSupplier = (supplier: Supplier) => {
-    setSuppliers([...suppliers, supplier]);
-    showToast('Proveedor registrado con éxito', 'success');
+  const handleDeleteExpense = async (id: string) => {
+    try {
+      await deleteExpense(id);
+      setExpenses(expenses.filter(e => e.id !== id));
+      showToast('Gasto eliminado', 'success');
+    } catch (e) {
+      showToast('Error al eliminar el gasto en la nube', 'error');
+    }
   };
 
-  const handleUpdateSupplier = (updatedSupplier: Supplier) => {
-    setSuppliers(suppliers.map(s => s.id === updatedSupplier.id ? updatedSupplier : s));
-    showToast('Datos del proveedor actualizados', 'success');
+  const handleAddSupplier = async (supplier: Supplier) => {
+    try {
+      await saveSupplier(supplier);
+      setSuppliers([...suppliers, supplier]);
+      showToast('Proveedor registrado con éxito', 'success');
+    } catch (e) {
+      showToast('Error al registrar el proveedor en la nube', 'error');
+    }
   };
 
-  const handleDeleteSupplier = (id: string) => {
-    setSuppliers(suppliers.filter(s => s.id !== id));
-    showToast('Proveedor eliminado', 'success');
+  const handleUpdateSupplier = async (updatedSupplier: Supplier) => {
+    try {
+      await saveSupplier(updatedSupplier);
+      setSuppliers(suppliers.map(s => s.id === updatedSupplier.id ? updatedSupplier : s));
+      showToast('Datos del proveedor actualizados', 'success');
+    } catch (e) {
+      showToast('Error al actualizar el proveedor en la nube', 'error');
+    }
   };
 
-  const handleAddPurchase = (purchase: Purchase, updatedProducts: Product[]) => {
-    setPurchases([...purchases, purchase]);
-    setProducts(updatedProducts);
-    showToast(`Llegada de productos: ${purchase.items.length} artículos de ${purchase.supplierName}`, 'success');
+  const handleDeleteSupplier = async (id: string) => {
+    try {
+      await deleteSupplier(id);
+      setSuppliers(suppliers.filter(s => s.id !== id));
+      showToast('Proveedor eliminado', 'success');
+    } catch (e) {
+      showToast('Error al eliminar el proveedor en la nube', 'error');
+    }
+  };
+
+  const handleAddPurchase = async (purchase: Purchase, updatedProducts: Product[]) => {
+    try {
+      await savePurchase(purchase);
+      for (const item of purchase.items) {
+        const prod = updatedProducts.find(p => p.id === item.productId);
+        if (prod) {
+          await saveProduct(prod);
+        }
+      }
+      setPurchases([...purchases, purchase]);
+      setProducts(updatedProducts);
+      showToast(`Llegada de productos: ${purchase.items.length} artículos de ${purchase.supplierName}`, 'success');
+    } catch (e) {
+      showToast('Error al registrar el ingreso en la nube', 'error');
+    }
   };
 
   if (!isDataLoaded) {
@@ -397,7 +642,7 @@ export default function App() {
           </div>
           
           <nav className="flex items-center gap-2">
-            {(currentUser?.role === 'Trabajador' ? navItems.filter(item => ['pos', 'history', 'inventory', 'purchases'].includes(item.id)) : navItems).map(item => (
+            {(currentUser?.role === 'Trabajador' ? navItems.filter(item => ['pos', 'history', 'closures', 'inventory', 'purchases'].includes(item.id)) : navItems).map(item => (
               <button
                 key={item.id}
                 onClick={() => handleTabChange(item.id)}
@@ -422,6 +667,47 @@ export default function App() {
 
         {/* Main Content */}
         <main className="flex-1 flex flex-col min-w-0 overflow-hidden bg-[#f8f5f0] rounded-tl-3xl border-t border-l border-[#e8dfd3] p-6 lg:p-8 relative">
+          {showMigrationBanner && currentUser?.role === 'Administrador' && (
+            <div className="mb-6 p-5 bg-[#fef3c7] border border-[#f59e0b]/30 rounded-3xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm relative overflow-hidden flex-shrink-0">
+              <div className="absolute top-0 left-0 h-full w-2 bg-[#f59e0b]" />
+              <div className="flex-1">
+                <h4 className="text-[#92400e] font-bold text-base flex items-center gap-2">
+                  <span className="flex h-2.5 w-2.5 relative">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#f59e0b] opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#f59e0b]"></span>
+                  </span>
+                  ⚠️ Datos Locales Pendientes de Sincronización
+                </h4>
+                <p className="text-[#78350f] text-sm mt-1 leading-relaxed">
+                  Hemos detectado que esta computadora tiene datos reales guardados localmente. Sincronízalos con la nube para que estén disponibles en otros dispositivos y no se borren.
+                </p>
+              </div>
+              <div className="flex items-center gap-3 flex-shrink-0 self-stretch md:self-auto justify-end">
+                <button
+                  onClick={handleExportBackup}
+                  className="px-4 py-2 text-xs font-bold text-[#78350f] hover:bg-[#fde68a] bg-transparent border border-[#78350f]/20 rounded-xl transition-all cursor-pointer"
+                >
+                  Descargar Respaldo (.json)
+                </button>
+                <button
+                  onClick={handleMigrateData}
+                  disabled={isMigrating}
+                  className="px-5 py-2.5 text-xs font-bold bg-[#1c1a17] hover:bg-black disabled:bg-[#1c1a17]/50 text-white rounded-xl flex items-center gap-2 shadow-sm transition-all active:scale-[0.98] cursor-pointer"
+                >
+                  {isMigrating ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      Sincronizando...
+                    </>
+                  ) : (
+                    <>
+                      Subir a la Nube
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
           
           <AnimatePresence>
             {showLogoutConfirm && (
@@ -523,13 +809,22 @@ export default function App() {
                 transition={{ duration: 0.2 }}
                 className="flex-1 flex flex-col h-full overflow-hidden"
               >
-                {activeTab === 'pos' && <POS products={products} onCompleteSale={handleSaleComplete} currentUser={currentUser} sales={sales} />}
+                {activeTab === 'pos' && (
+                  <POS 
+                    products={products} 
+                    onCompleteSale={handleSaleComplete} 
+                    onCompleteClosure={handleClosureComplete} 
+                    currentUser={currentUser} 
+                    sales={sales} 
+                  />
+                )}
                 {activeTab === 'inventory' && (
                   <Inventory
                     products={products}
                     onAddProduct={handleAddProduct}
                     onUpdateProduct={handleUpdateProduct}
                     onDeleteProduct={handleDeleteProduct}
+                    onImportProducts={handleImportProducts}
                   />
                 )}
                 {activeTab === 'sellers' && (
@@ -564,8 +859,18 @@ export default function App() {
                     onAddPurchase={handleAddPurchase}
                   />
                 )}
-                {activeTab === 'dashboard' && <Dashboard sales={sales} products={products} goals={goals} setGoals={setGoals} />}
-                {activeTab === 'history' && <History sales={currentUser?.role === 'Trabajador' ? sales.filter(s => s.sellerName === currentUser.name) : sales} onVoidSale={handleVoidSale} />}
+                {activeTab === 'dashboard' && <Dashboard sales={sales} products={products} goals={goals} setGoals={handleUpdateGoals} />}
+                {activeTab === 'history' && (
+                  <History 
+                    sales={currentUser?.role === 'Trabajador' ? sales.filter(s => s.sellerName === currentUser.name) : sales} 
+                    onVoidSale={handleVoidSale} 
+                  />
+                )}
+                {activeTab === 'closures' && (
+                  <Closures 
+                    closures={currentUser?.role === 'Trabajador' ? closures.filter(c => c.sellerName === currentUser.name) : closures} 
+                  />
+                )}
                 {activeTab === 'reports' && <Reports sales={sales} products={products} expenses={expenses} />}
               </motion.div>
             )}

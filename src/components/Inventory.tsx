@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Plus, Edit2, Trash2, FileText, Search, Download, ChevronDown } from 'lucide-react';
+import { Plus, Edit2, Trash2, FileText, Search, Download, ChevronDown, Upload } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Product } from '../types';
 import ExcelJS from 'exceljs';
+import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 import { useToast } from '../contexts/ToastContext';
 import DeleteConfirmModal from './DeleteConfirmModal';
@@ -12,16 +13,120 @@ interface InventoryProps {
   onAddProduct: (product: Product) => void;
   onUpdateProduct: (product: Product) => void;
   onDeleteProduct: (id: string) => void;
+  onImportProducts: (products: Product[]) => Promise<void>;
 }
 
-export default function Inventory({ products, onAddProduct, onUpdateProduct, onDeleteProduct }: InventoryProps) {
+export default function Inventory({ products, onAddProduct, onUpdateProduct, onDeleteProduct, onImportProducts }: InventoryProps) {
   const [isAdding, setIsAdding] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [itemToDelete, setItemToDelete] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [isImporting, setIsImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { showToast } = useToast();
 
   const filteredProducts = products.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
+
+  const handleImportExcel = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsImporting(true);
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        
+        const data = XLSX.utils.sheet_to_json<any>(ws);
+        
+        if (data.length === 0) {
+          showToast('El archivo Excel está vacío o no es válido', 'error');
+          setIsImporting(false);
+          return;
+        }
+
+        const importedProducts: Product[] = [];
+        const errors: string[] = [];
+
+        const validCategories = [
+          'Aves', 'Bovinos (Res)', 'Porcinos (Cerdo)', 'Ovinos / Caprinos', 
+          'Embutidos', 'Vísceras / Menudencias', 'Preparados / Marinados', 'Otros'
+        ];
+
+        data.forEach((row: any, index: number) => {
+          const rowNum = index + 2;
+          
+          const name = row['Producto'] || row['Name'] || row['Nombre'] || row['name'] || row['producto'] || row['nombre'];
+          const category = row['Categoría'] || row['Category'] || row['Categoria'] || row['category'] || row['categoría'] || row['categoria'];
+          const stock = row['Stock'] || row['stock'] || row['Inventario'] || row['inventario'] || row['Cantidad'] || row['cantidad'];
+          const unit = row['Unidad'] || row['Unit'] || row['unit'] || row['unidad'] || row['Medida'] || row['medida'];
+          const cost = row['Costo'] || row['Cost'] || row['cost'] || row['costo'] || row['Costo ($)'] || row['costo ($)'];
+          const price = row['Precio'] || row['Price'] || row['price'] || row['precio'] || row['Precio ($)'] || row['precio ($)'];
+
+          if (!name) {
+            errors.push(`Fila ${rowNum}: Falta el nombre del producto.`);
+            return;
+          }
+
+          const priceNum = parseFloat(price);
+          if (isNaN(priceNum) || priceNum <= 0) {
+            errors.push(`Fila ${rowNum} (${name}): El precio debe ser un número mayor a 0.`);
+            return;
+          }
+
+          let costNum: number | undefined = undefined;
+          if (cost !== undefined && cost !== null && cost !== '') {
+            costNum = parseFloat(cost);
+            if (isNaN(costNum) || costNum < 0) {
+              errors.push(`Fila ${rowNum} (${name}): El costo debe ser un número válido.`);
+              return;
+            }
+          }
+
+          const stockNum = parseFloat(stock);
+          if (isNaN(stockNum) || stockNum < 0) {
+            errors.push(`Fila ${rowNum} (${name}): El stock debe ser un número válido.`);
+            return;
+          }
+
+          const normalizedCategory = category ? String(category).trim() : 'Otros';
+          const matchedCategory = validCategories.find(c => c.toLowerCase() === normalizedCategory.toLowerCase()) || 'Otros';
+          const normalizedUnit = unit ? String(unit).trim() : 'ud';
+
+          importedProducts.push({
+            id: Math.random().toString(36).substr(2, 9),
+            name: String(name).trim(),
+            price: priceNum,
+            cost: costNum,
+            stock: stockNum,
+            unit: normalizedUnit,
+            category: matchedCategory as any
+          });
+        });
+
+        if (errors.length > 0) {
+          showToast(`Error al importar: ${errors.slice(0, 3).join(' ')}${errors.length > 3 ? ' y más...' : ''}`, 'error');
+          setIsImporting(false);
+          return;
+        }
+
+        await onImportProducts(importedProducts);
+        
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+      } catch (err) {
+        console.error(err);
+        showToast('Error al procesar el archivo Excel', 'error');
+      } finally {
+        setIsImporting(false);
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
 
   const handleDownloadExcel = async () => {
     const workbook = new ExcelJS.Workbook();
@@ -99,6 +204,22 @@ export default function Inventory({ products, onAddProduct, onUpdateProduct, onD
                 className="pl-10 pr-4 py-2 bg-white border border-[#e8dfd3] shadow-sm rounded-full text-sm focus:ring-2 focus:ring-[#cbaefc] focus:outline-none w-56"
               />
             </div>
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              onChange={handleImportExcel} 
+              accept=".xlsx,.xls" 
+              className="hidden" 
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isImporting}
+              className="bg-white border border-[#e8dfd3] hover:bg-[#f0e8dd] text-[#1c1a17] px-4 py-2.5 rounded-full font-bold flex items-center gap-2 transition-all shadow-sm text-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Importar Excel"
+            >
+              <Upload className="w-4 h-4" />
+              <span className="hidden sm:inline">{isImporting ? 'Importando...' : 'Importar'}</span>
+            </button>
             <button
               onClick={handleDownloadExcel}
               className="bg-white border border-[#e8dfd3] hover:bg-[#f0e8dd] text-[#1c1a17] px-4 py-2.5 rounded-full font-bold flex items-center gap-2 transition-all shadow-sm text-sm cursor-pointer"

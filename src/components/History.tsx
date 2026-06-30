@@ -21,7 +21,6 @@ export default function History({ sales, onVoidSale }: HistoryProps) {
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
   const [saleToVoid, setSaleToVoid] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [showOnlyClosures, setShowOnlyClosures] = useState(false);
 
   const filteredSales = useMemo(() => {
     return sales.filter(sale => {
@@ -34,7 +33,6 @@ export default function History({ sales, onVoidSale }: HistoryProps) {
         try {
           const saleDate = new Date(sale.date);
           const start = startDate ? startOfDay(parseISO(startDate)) : new Date(0);
-          // Si solo hay startDate, endDate asume el final de ese mismo día. Si hay endDate, usa ese.
           const end = endDate ? endOfDay(parseISO(endDate)) : (startDate ? endOfDay(parseISO(startDate)) : new Date(8640000000000000));
           matchesDateRange = isWithinInterval(saleDate, { start, end });
         } catch (e) {
@@ -42,11 +40,9 @@ export default function History({ sales, onVoidSale }: HistoryProps) {
         }
       }
 
-      const matchesType = showOnlyClosures ? sale.isCashRegisterClose === true : true;
-
-      return matchesSearch && matchesDateRange && matchesType;
+      return matchesSearch && matchesDateRange;
     }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [sales, searchTerm, startDate, endDate, showOnlyClosures]);
+  }, [sales, searchTerm, startDate, endDate]);
 
   const totalPages = Math.ceil(filteredSales.length / ITEMS_PER_PAGE);
   const currentSales = filteredSales.slice(
@@ -58,7 +54,7 @@ export default function History({ sales, onVoidSale }: HistoryProps) {
   useMemo(() => {
     setCurrentPage(1);
     setSelectedSale(null);
-  }, [searchTerm, startDate, endDate, showOnlyClosures]);
+  }, [searchTerm, startDate, endDate]);
 
   const handleExportExcel = () => {
     if (filteredSales.length === 0) return;
@@ -140,15 +136,6 @@ export default function History({ sales, onVoidSale }: HistoryProps) {
                     className="pl-9 pr-4 py-2 bg-white border border-[#e8dfd3] rounded-full text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#cbaefc] w-48 transition-all"
                   />
                 </div>
-                <label className="flex items-center gap-2 cursor-pointer bg-white border border-[#e8dfd3] px-3 py-2 rounded-full hover:bg-gray-50 transition-colors">
-                  <input 
-                    type="checkbox" 
-                    checked={showOnlyClosures}
-                    onChange={(e) => setShowOnlyClosures(e.target.checked)}
-                    className="accent-[#cbaefc] w-4 h-4 cursor-pointer"
-                  />
-                  <span className="text-sm font-semibold text-[#1c1a17]">Solo cierres</span>
-                </label>
                 <button
                   onClick={handleExportExcel}
                   disabled={filteredSales.length === 0}
@@ -310,7 +297,7 @@ export default function History({ sales, onVoidSale }: HistoryProps) {
                     {selectedSale.items.map((item, idx) => (
                       <div key={idx} className="flex justify-between items-center">
                         <div className="flex-1">
-                          <p className="font-bold text-[#1c1a17]">{item.name}</p>
+                          <p className="font-bold text-[#1c1a17]">{item.productName || item.name}</p>
                           <p className="text-sm text-[#878077] font-medium">
                             {item.quantity} x ${item.price.toFixed(2)}
                           </p>
@@ -340,7 +327,7 @@ export default function History({ sales, onVoidSale }: HistoryProps) {
                   </div>
                 </div>
 
-                {selectedSale.status !== 'voided' && onVoidSale && (
+                {selectedSale.status !== 'voided' && !selectedSale.isCashRegisterClose && onVoidSale && (
                   <div className="mt-8 pt-6 border-t border-[#e8dfd3] flex justify-end">
                     <button 
                       onClick={() => setSaleToVoid(selectedSale.id)}
