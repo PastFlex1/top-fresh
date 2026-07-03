@@ -21,6 +21,7 @@ export default function History({ sales, onVoidSale }: HistoryProps) {
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
   const [saleToVoid, setSaleToVoid] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [showOnlyClosures, setShowOnlyClosures] = useState(false);
 
   const filteredSales = useMemo(() => {
     return sales.filter(sale => {
@@ -40,9 +41,11 @@ export default function History({ sales, onVoidSale }: HistoryProps) {
         }
       }
 
-      return matchesSearch && matchesDateRange;
+      const matchesType = showOnlyClosures ? sale.isCashRegisterClose === true : true;
+
+      return matchesSearch && matchesDateRange && matchesType;
     }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [sales, searchTerm, startDate, endDate]);
+  }, [sales, searchTerm, startDate, endDate, showOnlyClosures]);
 
   const totalPages = Math.ceil(filteredSales.length / ITEMS_PER_PAGE);
   const currentSales = filteredSales.slice(
@@ -54,7 +57,7 @@ export default function History({ sales, onVoidSale }: HistoryProps) {
   useMemo(() => {
     setCurrentPage(1);
     setSelectedSale(null);
-  }, [searchTerm, startDate, endDate]);
+  }, [searchTerm, startDate, endDate, showOnlyClosures]);
 
   const handleExportExcel = () => {
     if (filteredSales.length === 0) return;
@@ -136,6 +139,15 @@ export default function History({ sales, onVoidSale }: HistoryProps) {
                     className="pl-9 pr-4 py-2 bg-white border border-[#e8dfd3] rounded-full text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#cbaefc] w-48 transition-all"
                   />
                 </div>
+                <label className="flex items-center gap-2 cursor-pointer bg-white border border-[#e8dfd3] px-3 py-2 rounded-full hover:bg-gray-50 transition-colors">
+                  <input 
+                    type="checkbox" 
+                    checked={showOnlyClosures}
+                    onChange={(e) => setShowOnlyClosures(e.target.checked)}
+                    className="accent-[#cbaefc] w-4 h-4 cursor-pointer"
+                  />
+                  <span className="text-sm font-semibold text-[#1c1a17]">Solo cierres</span>
+                </label>
                 <button
                   onClick={handleExportExcel}
                   disabled={filteredSales.length === 0}

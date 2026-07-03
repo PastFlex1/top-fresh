@@ -145,15 +145,19 @@ export default function App() {
         const migratedClosures: Closure[] = fetchedClosures.map(mapSaleToClosure);
         
         for (const sale of fetchedSales) {
-          if (sale.isCashRegisterClose) {
+          const isClosure = sale.isCashRegisterClose || sale.items?.some((i: any) => i.productId === 'cash' || i.productId === 'transfer' || i.productName === 'Total Efectivo' || i.productName === 'Total Transferencias');
+          if (isClosure) {
             try {
               const mapped = mapSaleToClosure(sale);
               await saveClosure(mapped);
               await deleteSale(sale.id);
-              migratedClosures.push(mapped);
+              if (!migratedClosures.some(c => c.id === mapped.id)) {
+                migratedClosures.push(mapped);
+              }
             } catch (err) {
               console.error("Error migrando cierre antiguo:", sale.id, err);
-              cleanSales.push(sale);
+              // NOT pushing to cleanSales ensures that even if deletion in Firestore fails, 
+              // these closures do not show up as normal sales in the application.
             }
           } else {
             cleanSales.push(sale);
@@ -387,6 +391,26 @@ export default function App() {
 
     try {
       await saveClosure(finalClosure);
+
+      // Marcar las ventas del día actual como cerradas (isCashRegisterClose: true)
+      const ecuadorTimeZone = 'America/Guayaquil';
+      const today = formatInTimeZone(new Date(), ecuadorTimeZone, 'yyyy-MM-dd');
+      
+      const updatedSales = await Promise.all(sales.map(async (s) => {
+        try {
+          const saleDate = formatInTimeZone(new Date(s.date), ecuadorTimeZone, 'yyyy-MM-dd');
+          if (saleDate === today && s.status !== 'voided' && !s.isCashRegisterClose) {
+            const updated = { ...s, isCashRegisterClose: true };
+            await saveSale(updated);
+            return updated;
+          }
+        } catch (e) {
+          console.error("Error al actualizar estado de cierre en la venta:", s.id, e);
+        }
+        return s;
+      }));
+
+      setSales(updatedSales);
       setClosures([finalClosure, ...closures]);
       showToast('Cierre de caja generado con éxito', 'success');
     } catch (error) {
