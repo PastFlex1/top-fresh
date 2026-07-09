@@ -17,6 +17,7 @@ export default function POS({ products, onCompleteSale, onCompleteClosure, sales
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<'Efectivo' | 'Transferencia'>('Efectivo');
   const [receiptNumber, setReceiptNumber] = useState('');
+  const [amountReceived, setAmountReceived] = useState('');
   
   const [isClosingModalOpen, setIsClosingModalOpen] = useState(false);
   const [realCashInput, setRealCashInput] = useState('');
@@ -92,6 +93,7 @@ export default function POS({ products, onCompleteSale, onCompleteClosure, sales
     onCompleteSale(newSale);
     setCart([]);
     setReceiptNumber('');
+    setAmountReceived('');
   };
 
   const handleCashRegisterClose = () => {
@@ -304,6 +306,34 @@ export default function POS({ products, onCompleteSale, onCompleteClosure, sales
             <span className="font-bold text-[#1c1a17] text-sm uppercase tracking-wider">Total a Pagar</span>
             <span className="font-black text-[#1c1a17] text-3xl tracking-tight leading-none">${total.toFixed(2)}</span>
           </div>
+          
+          {paymentMethod === 'Efectivo' && cart.length > 0 && (
+            <div className="bg-[#f0e8dd] rounded-xl p-3 mb-5 border border-[#d7ccc0]">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold text-[#878077] uppercase tracking-wider">Monto Recibido</span>
+                <div className="relative w-28">
+                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[#1c1a17] font-bold text-sm">$</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="0.00"
+                    value={amountReceived}
+                    onChange={(e) => setAmountReceived(e.target.value)}
+                    className="w-full bg-white border border-[#e8dfd3] rounded-lg pl-6 pr-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#cbaefc] font-bold text-right"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-between items-center pt-2 border-t border-[#d7ccc0] border-dashed">
+                <span className="text-xs font-bold text-[#878077] uppercase tracking-wider">Cambio</span>
+                <span className={`font-black text-xl tracking-tight ${
+                  (parseFloat(amountReceived) || 0) >= total && amountReceived !== '' ? 'text-green-600' : 'text-[#878077]'
+                }`}>
+                  ${Math.max(0, (parseFloat(amountReceived) || 0) - total).toFixed(2)}
+                </span>
+              </div>
+            </div>
+          )}
           <button
             onClick={handleComplete}
             disabled={cart.length === 0 || (paymentMethod === 'Transferencia' && !receiptNumber.trim())}
