@@ -5,7 +5,7 @@
 
 import { useState, useEffect } from 'react';
 import { formatInTimeZone } from 'date-fns-tz';
-import { Beef, Search, Bell, User, Home, Mail, ShoppingCart, Store, FileText, LayoutDashboard, History as HistoryIcon, BarChart, Loader2 } from 'lucide-react';
+import { Beef, Search, Bell, User, Home, Mail, ShoppingCart, Store, FileText, LayoutDashboard, History as HistoryIcon, BarChart, Loader2, Trash2 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Goal, Product, Sale, Seller, Expense, Supplier, Purchase, Closure } from './types';
 import POS from './components/POS';
@@ -24,7 +24,7 @@ import {
   getProducts, getSales, getSellers, getExpenses, getSuppliers, getPurchases, getGoals,
   saveProduct, deleteProduct, saveSale, saveSeller, deleteSeller, saveExpense, deleteExpense,
   saveSupplier, deleteSupplier, savePurchase, saveGoal, saveGoals, hasLocalData, migrateLocalToFirestore,
-  saveProducts, saveSellers, saveSuppliers, getClosures, saveClosure, deleteSale
+  saveProducts, saveSellers, saveSuppliers, getClosures, saveClosure, deleteSale, clearAllData
 } from './services/api';
 import { useToast } from './contexts/ToastContext';
 
@@ -68,6 +68,7 @@ export default function App() {
   const [showClosingReminder, setShowClosingReminder] = useState(false);
   const [showMigrationBanner, setShowMigrationBanner] = useState(false);
   const [isMigrating, setIsMigrating] = useState(false);
+  const [showClearSystemConfirm, setShowClearSystemConfirm] = useState(false);
 
   // Carga de datos asíncrona simulando una llamada a API
   useEffect(() => {
@@ -400,6 +401,41 @@ export default function App() {
     }
   };
 
+  const handleClearSystem = async () => {
+    try {
+      await clearAllData();
+      
+      const keys = [
+        'topfresh_products',
+        'topfresh_sales',
+        'topfresh_sellers',
+        'topfresh_expenses',
+        'topfresh_suppliers',
+        'topfresh_purchases',
+        'topfresh_goals'
+      ];
+      keys.forEach(k => localStorage.removeItem(k));
+      
+      setSales([]);
+      setClosures([]);
+      setExpenses([]);
+      setPurchases([]);
+      setGoals([]);
+      
+      setProducts(INITIAL_PRODUCTS);
+      await saveProducts(INITIAL_PRODUCTS);
+      setSellers(INITIAL_SELLERS);
+      await saveSellers(INITIAL_SELLERS);
+      setSuppliers(INITIAL_SUPPLIERS);
+      await saveSuppliers(INITIAL_SUPPLIERS);
+      
+      setShowClearSystemConfirm(false);
+      showToast('Sistema limpiado correctamente. Listo para producción.', 'success');
+    } catch (e) {
+      showToast('Error al limpiar el sistema', 'error');
+    }
+  };
+
   const handleClosureComplete = async (closure: Closure) => {
     const maxSequence = closures.reduce((max, c) => Math.max(max, c.sequenceNumber ?? -1), -1);
     const finalClosure = { ...closure, sequenceNumber: maxSequence + 1 };
@@ -698,6 +734,11 @@ export default function App() {
 
           <div className="flex items-center gap-4">
             <Notifications products={products} purchases={purchases} />
+            {currentUser?.role === 'Administrador' && (
+              <button onClick={() => setShowClearSystemConfirm(true)} className="w-10 h-10 rounded-full bg-red-50 text-red-600 flex items-center justify-center border-2 border-white shadow-sm overflow-hidden hover:bg-red-100 hover:text-red-700 transition-colors" title="Limpiar Sistema">
+                 <Trash2 className="w-5 h-5 mt-0.5" />
+              </button>
+            )}
             <button onClick={() => setShowLogoutConfirm(true)} className="w-10 h-10 rounded-full bg-[#d7ccc0] flex items-center justify-center border-2 border-white shadow-sm overflow-hidden hover:bg-[#cbbbad] transition-colors" title="Cerrar sesión">
                <User className="w-5 h-5 text-white mt-1" />
             </button>
@@ -783,6 +824,46 @@ export default function App() {
                       className="flex-1 py-3 bg-[#e11d48] text-white rounded-xl font-bold hover:bg-red-700 transition-colors"
                     >
                       Cerrar sesión
+                    </button>
+                  </div>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Modal Limpiar Sistema */}
+          <AnimatePresence>
+            {showClearSystemConfirm && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 bg-[#1c1a17] bg-opacity-40 backdrop-blur-sm z-[99] flex items-center justify-center p-4"
+              >
+                <motion.div
+                  initial={{ scale: 0.8, opacity: 0, y: 20 }}
+                  animate={{ scale: 1, opacity: 1, y: 0 }}
+                  exit={{ scale: 0.8, opacity: 0, y: 20 }}
+                  className="bg-white rounded-3xl shadow-xl w-full max-w-sm p-6 flex flex-col items-center text-center"
+                >
+                  <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4">
+                    <Trash2 className="w-8 h-8 text-red-600" />
+                  </div>
+                  <h3 className="text-lg font-bold text-[#1c1a17]">¿Limpiar el Sistema?</h3>
+                  <p className="text-sm text-red-600 mt-2 mb-6 font-medium">Esta acción es IRREVERSIBLE. Se borrarán todas las ventas, productos, y configuraciones. ¿Continuar?</p>
+                  
+                  <div className="flex gap-3 w-full">
+                    <button
+                      onClick={() => setShowClearSystemConfirm(false)}
+                      className="flex-1 py-3 bg-[#fcfaf7] border border-[#e8dfd3] rounded-xl font-bold text-[#1c1a17] hover:bg-gray-50 transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={handleClearSystem}
+                      className="flex-1 py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-colors"
+                    >
+                      Limpiar Todo
                     </button>
                   </div>
                 </motion.div>
