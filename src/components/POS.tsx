@@ -6,12 +6,13 @@ import { Product, CartItem, Sale, Seller, Closure } from '../types';
 interface POSProps {
   products: Product[];
   sales?: Sale[];
+  closures?: Closure[];
   currentUser?: Seller | null;
   onCompleteSale: (sale: Sale) => void;
   onCompleteClosure: (closure: Closure) => void;
 }
 
-export default function POS({ products, onCompleteSale, onCompleteClosure, sales = [], currentUser = null }: POSProps) {
+export default function POS({ products, onCompleteSale, onCompleteClosure, sales = [], closures = [], currentUser = null }: POSProps) {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -99,6 +100,22 @@ export default function POS({ products, onCompleteSale, onCompleteClosure, sales
   const handleCashRegisterClose = () => {
     const ecuadorTimeZone = 'America/Guayaquil';
     const today = formatInTimeZone(new Date(), ecuadorTimeZone, 'yyyy-MM-dd');
+    
+    // Check if a closure already exists for today
+    const alreadyClosedToday = closures.some(c => {
+      try {
+        const closureDate = formatInTimeZone(new Date(c.date), ecuadorTimeZone, 'yyyy-MM-dd');
+        return closureDate === today;
+      } catch (e) {
+        return false;
+      }
+    });
+
+    if (alreadyClosedToday) {
+      setToastMessage('Ya se realizó el cierre de caja de hoy. Solo se permite 1 cierre por día.');
+      setTimeout(() => setToastMessage(null), 4000);
+      return;
+    }
     
     const todaysSales = sales.filter(s => {
       try {

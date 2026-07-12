@@ -57,14 +57,14 @@ export default function Notifications({ products, purchases }: NotificationsProp
   const unreadCount = notifications.length;
 
   return (
-    <div className="relative" ref={popoverRef}>
+    <div className="relative shrink-0 flex items-center" ref={popoverRef}>
       <button 
         onClick={() => setIsOpen(!isOpen)}
-        className="w-10 h-10 relative rounded-full border border-[#e8dfd3] flex items-center justify-center text-[#878077] bg-white hover:bg-[#fcfaf7]"
+        className="w-10 h-10 relative rounded-full bg-white text-[#878077] flex items-center justify-center border-2 border-[#e8dfd3] shadow-sm hover:bg-[#fcfaf7] transition-colors"
       >
-        <Bell className="w-4 h-4" />
+        <Bell className="w-5 h-5" />
         {unreadCount > 0 && (
-          <span className="absolute top-0 right-0 w-3 h-3 bg-red-500 border-2 border-white rounded-full"></span>
+          <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-red-500 border-2 border-white rounded-full"></span>
         )}
       </button>
 

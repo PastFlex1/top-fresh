@@ -936,6 +936,7 @@ export default function App() {
                     onCompleteClosure={handleClosureComplete} 
                     currentUser={currentUser} 
                     sales={sales} 
+                    closures={closures}
                   />
                 )}
                 {activeTab === 'inventory' && (

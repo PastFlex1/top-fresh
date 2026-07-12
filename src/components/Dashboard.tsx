@@ -13,7 +13,7 @@ export default function Dashboard({ sales, products, goals, setGoals }: { sales:
   const monthStart = startOfMonth(todayDate);
   const monthEnd = endOfMonth(todayDate);
   
-  const activeSales = sales.filter(s => s.status !== 'voided' && !s.isCashRegisterClose);
+  const activeSales = sales.filter(s => s.status !== 'voided');
   const voidedSales = sales.filter(s => s.status === 'voided');
 
   const salesToday = activeSales.filter(s => {
