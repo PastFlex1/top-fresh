@@ -59,12 +59,23 @@ export default function Inventory({ products, onAddProduct, onUpdateProduct, onD
         data.forEach((row: any, index: number) => {
           const rowNum = index + 2;
           
-          const name = row['Producto'] || row['Name'] || row['Nombre'] || row['name'] || row['producto'] || row['nombre'];
-          const category = row['Categoría'] || row['Category'] || row['Categoria'] || row['category'] || row['categoría'] || row['categoria'];
-          const stock = row['Stock'] || row['stock'] || row['Inventario'] || row['inventario'] || row['Cantidad'] || row['cantidad'];
-          const unit = row['Unidad'] || row['Unit'] || row['unit'] || row['unidad'] || row['Medida'] || row['medida'];
-          const cost = row['Costo'] || row['Cost'] || row['cost'] || row['costo'] || row['Costo ($)'] || row['costo ($)'];
-          const price = row['Precio'] || row['Price'] || row['price'] || row['precio'] || row['Precio ($)'] || row['precio ($)'];
+          const getValue = (r: any, keys: string[]) => {
+            for (const k of keys) {
+              if (r[k] !== undefined && r[k] !== null && r[k] !== '') {
+                return r[k];
+              }
+            }
+            return undefined;
+          };
+
+          const name = getValue(row, ['Producto', 'Name', 'Nombre', 'name', 'producto', 'nombre']);
+          const category = getValue(row, ['Categoría', 'Category', 'Categoria', 'category', 'categoría', 'categoria']);
+          let stock = getValue(row, ['Stock', 'stock', 'Inventario', 'inventario', 'Cantidad', 'cantidad']);
+          const unit = getValue(row, ['Unidad', 'Unit', 'unit', 'unidad', 'Medida', 'medida']);
+          const cost = getValue(row, ['Costo', 'Cost', 'cost', 'costo', 'Costo ($)', 'costo ($)']);
+          const price = getValue(row, ['Precio', 'Price', 'price', 'precio', 'Precio ($)', 'precio ($)']);
+
+          if (stock === undefined) stock = 0; // Default stock to 0 if not provided
 
           if (!name) {
             errors.push(`Fila ${rowNum}: Falta el nombre del producto.`);
