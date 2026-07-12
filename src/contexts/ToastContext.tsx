@@ -43,23 +43,22 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               initial={{ opacity: 0, y: 50, scale: 0.9 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
-              className={`pointer-events-auto flex items-start gap-3 p-4 rounded-2xl shadow-lg border ${
-                toast.type === 'success' 
-                  ? 'bg-white border-green-200 text-green-800' 
+              className={`pointer-events-auto flex items-start gap-3 p-4 rounded-2xl shadow-lg border ${toast.type === 'success'
+                  ? 'bg-white border-green-200 text-green-800'
                   : toast.type === 'error'
-                  ? 'bg-white border-red-200 text-red-800'
-                  : 'bg-white border-yellow-200 text-yellow-800'
-              }`}
+                    ? 'bg-white border-red-200 text-red-800'
+                    : 'bg-white border-yellow-200 text-yellow-800'
+                }`}
             >
               {toast.type === 'success' && <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0 mt-0.5" />}
               {toast.type === 'error' && <XCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />}
               {toast.type === 'warning' && <AlertCircle className="w-5 h-5 text-yellow-500 shrink-0 mt-0.5" />}
-              
+
               <p className="flex-1 text-sm font-bold text-[#1c1a17] leading-relaxed">
                 {toast.message}
               </p>
-              
-              <button 
+
+              <button
                 onClick={() => removeToast(toast.id)}
                 className="text-[#878077] hover:text-[#1c1a17] transition-colors shrink-0"
               >
