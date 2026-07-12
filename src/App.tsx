@@ -710,13 +710,13 @@ export default function App() {
     <div className="bg-[#f0e8dd] text-[#1c1a17] font-sans h-screen w-full flex flex-col overflow-hidden select-none p-2 sm:p-4 2xl:px-6 2xl:py-6 font-medium relative">
       <div className="bg-[#fcfaf7] w-full h-full rounded-2xl sm:rounded-3xl 2xl:rounded-[2.5rem] shadow-lg flex flex-col overflow-hidden border border-[#e8dfd3]">
         {/* Top Navbar */}
-        <header className="h-16 2xl:h-20 px-4 2xl:px-8 flex items-center justify-between flex-shrink-0 overflow-x-auto no-scrollbar">
+        <header className="h-16 2xl:h-20 px-4 2xl:px-8 flex items-center justify-between flex-shrink-0">
           <div className="flex items-center gap-3">
             <Beef className="w-6 h-6 text-[#1c1a17]" />
             <span className="font-bold tracking-tight text-xl">Top Fresh</span>
           </div>
           
-          <nav className="flex items-center gap-2">
+          <nav className="flex items-center gap-2 overflow-x-auto no-scrollbar">
             {(currentUser?.role === 'Trabajador' ? navItems.filter(item => ['pos', 'history', 'closures', 'inventory', 'purchases'].includes(item.id)) : navItems).map(item => (
               <button
                 key={item.id}
