@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { Purchase, PurchaseItem, Product, Supplier } from '../types';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import Select from 'react-select';
 
 interface PurchasesProps {
   purchases: Purchase[];
@@ -258,16 +259,40 @@ function PurchaseForm({ products, suppliers, onSubmit, onCancel }: { products: P
             <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
                 <div className="md:col-span-5 space-y-1">
                     <label className="text-xs font-semibold text-gray-500">Producto</label>
-                    <select
-                        className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#cbaefc]"
-                        value={selectedProductId}
-                        onChange={(e) => handleProductSelect(e.target.value)}
-                    >
-                        <option value="">Selecciona producto...</option>
-                        {activeProducts.map(p => (
-                            <option key={p.id} value={p.id}>{p.name} ({p.category})</option>
-                        ))}
-                    </select>
+                    <Select
+                        className="text-sm"
+                        placeholder="Buscar producto..."
+                        noOptionsMessage={() => "No se encontraron productos"}
+                        value={activeProducts.map(p => ({ value: p.id, label: `${p.name} (${p.category})` })).find(option => option.value === selectedProductId) || null}
+                        onChange={(selectedOption) => handleProductSelect(selectedOption ? selectedOption.value : '')}
+                        options={activeProducts.map(p => ({
+                            value: p.id,
+                            label: `${p.name} (${p.category})`
+                        }))}
+                        isClearable
+                        menuPortalTarget={document.body}
+                        styles={{
+                            menuPortal: base => ({ ...base, zIndex: 9999 }),
+                            control: (base) => ({
+                                ...base,
+                                borderColor: '#e5e7eb', // gray-200
+                                borderRadius: '0.5rem', // rounded-lg
+                                minHeight: '38px',
+                                boxShadow: 'none',
+                                '&:hover': {
+                                    borderColor: '#cbaefc'
+                                }
+                            }),
+                            option: (base, state) => ({
+                                ...base,
+                                backgroundColor: state.isSelected ? '#1c1a17' : state.isFocused ? '#fcfaf7' : 'white',
+                                color: state.isSelected ? 'white' : '#1c1a17',
+                                '&:active': {
+                                    backgroundColor: '#e8dfd3'
+                                }
+                            })
+                        }}
+                    />
                 </div>
                 
                 <div className="md:col-span-3 space-y-1">

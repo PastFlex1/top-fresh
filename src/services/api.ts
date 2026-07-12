@@ -1,298 +1,110 @@
-import { db } from '../lib/firebase';
-import { collection, doc, getDocs, setDoc, deleteDoc } from 'firebase/firestore';
 import { Product, Sale, Seller, Expense, Supplier, Purchase, Goal, Closure } from '../types';
 
-// Helper function to recursively remove undefined values from objects before writing to Firestore
-const removeUndefined = (obj: any): any => {
-  if (obj === null || typeof obj !== 'object') {
-    return obj;
-  }
-  if (Array.isArray(obj)) {
-    return obj.map(removeUndefined);
-  }
-  return Object.fromEntries(
-    Object.entries(obj)
-      .filter(([_, value]) => value !== undefined)
-      .map(([key, value]) => [key, removeUndefined(value)])
-  );
-};
+const API_URL = 'http://localhost:3001/api';
 
-// --- API de Productos ---
-export const getProducts = async (): Promise<Product[]> => {
+// --- Funciones genéricas ---
+
+async function fetchCollection<T>(collection: string): Promise<T[]> {
   try {
-    const querySnapshot = await getDocs(collection(db, 'products'));
-    const list: Product[] = [];
-    querySnapshot.forEach((doc) => {
-      list.push(doc.data() as Product);
-    });
-    return list;
+    const res = await fetch(`${API_URL}/${collection}`);
+    if (!res.ok) throw new Error('Error fetching data');
+    return await res.json();
   } catch (error) {
-    console.error("Error obteniendo productos:", error);
+    console.error(`Error obteniendo ${collection}:`, error);
     return [];
   }
-};
+}
 
-export const saveProduct = async (product: Product): Promise<void> => {
+async function saveDocument<T extends { id: string }>(collection: string, item: T): Promise<void> {
   try {
-    await setDoc(doc(db, 'products', product.id), removeUndefined(product));
+    const res = await fetch(`${API_URL}/${collection}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(item),
+    });
+    if (!res.ok) throw new Error('Error saving data');
   } catch (error) {
-    console.error("Error guardando producto:", error);
+    console.error(`Error guardando ${collection}:`, error);
     throw error;
   }
-};
+}
 
-export const deleteProduct = async (id: string): Promise<void> => {
+async function saveManyDocuments<T extends { id: string }>(collection: string, items: T[]): Promise<void> {
   try {
-    await deleteDoc(doc(db, 'products', id));
+    const res = await fetch(`${API_URL}/${collection}/batch`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(items),
+    });
+    if (!res.ok) throw new Error('Error saving batch data');
   } catch (error) {
-    console.error("Error eliminando producto:", error);
+    console.error(`Error guardando múltiples ${collection}:`, error);
+  }
+}
+
+async function deleteDocument(collection: string, id: string): Promise<void> {
+  try {
+    const res = await fetch(`${API_URL}/${collection}/${id}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) throw new Error('Error deleting data');
+  } catch (error) {
+    console.error(`Error eliminando ${collection}:`, error);
     throw error;
   }
-};
+}
 
-export const saveProducts = async (products: Product[]): Promise<void> => {
-  try {
-    for (const product of products) {
-      await saveProduct(product);
-    }
-  } catch (error) {
-    console.error("Error guardando múltiples productos:", error);
-  }
-};
+// --- API de Productos ---
+export const getProducts = () => fetchCollection<Product>('products');
+export const saveProduct = (product: Product) => saveDocument('products', product);
+export const deleteProduct = (id: string) => deleteDocument('products', id);
+export const saveProducts = (products: Product[]) => saveManyDocuments('products', products);
 
 // --- API de Ventas ---
 export const getSales = async (): Promise<Sale[]> => {
-  try {
-    const querySnapshot = await getDocs(collection(db, 'sales'));
-    const list: Sale[] = [];
-    querySnapshot.forEach((doc) => {
-      list.push(doc.data() as Sale);
-    });
-    // Sort sales by date descending (newest first) as the app expects
-    return list.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  } catch (error) {
-    console.error("Error obteniendo ventas:", error);
-    return [];
-  }
+  const sales = await fetchCollection<Sale>('sales');
+  return sales.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 };
-
-export const saveSale = async (sale: Sale): Promise<void> => {
-  try {
-    await setDoc(doc(db, 'sales', sale.id), removeUndefined(sale));
-  } catch (error) {
-    console.error("Error guardando venta:", error);
-    throw error;
-  }
-};
-
-export const saveSales = async (sales: Sale[]): Promise<void> => {
-  try {
-    for (const sale of sales) {
-      await saveSale(sale);
-    }
-  } catch (error) {
-    console.error("Error guardando múltiples ventas:", error);
-  }
-};
+export const saveSale = (sale: Sale) => saveDocument('sales', sale);
+export const saveSales = (sales: Sale[]) => saveManyDocuments('sales', sales);
+export const deleteSale = (id: string) => deleteDocument('sales', id);
 
 // --- API de Vendedores ---
-export const getSellers = async (): Promise<Seller[]> => {
-  try {
-    const querySnapshot = await getDocs(collection(db, 'sellers'));
-    const list: Seller[] = [];
-    querySnapshot.forEach((doc) => {
-      list.push(doc.data() as Seller);
-    });
-    return list;
-  } catch (error) {
-    console.error("Error obteniendo vendedores:", error);
-    return [];
-  }
-};
-
-export const saveSeller = async (seller: Seller): Promise<void> => {
-  try {
-    await setDoc(doc(db, 'sellers', seller.id), removeUndefined(seller));
-  } catch (error) {
-    console.error("Error guardando vendedor:", error);
-    throw error;
-  }
-};
-
-export const deleteSeller = async (id: string): Promise<void> => {
-  try {
-    await deleteDoc(doc(db, 'sellers', id));
-  } catch (error) {
-    console.error("Error eliminando vendedor:", error);
-    throw error;
-  }
-};
-
-export const saveSellers = async (sellers: Seller[]): Promise<void> => {
-  try {
-    for (const seller of sellers) {
-      await saveSeller(seller);
-    }
-  } catch (error) {
-    console.error("Error guardando múltiples vendedores:", error);
-  }
-};
+export const getSellers = () => fetchCollection<Seller>('sellers');
+export const saveSeller = (seller: Seller) => saveDocument('sellers', seller);
+export const deleteSeller = (id: string) => deleteDocument('sellers', id);
+export const saveSellers = (sellers: Seller[]) => saveManyDocuments('sellers', sellers);
 
 // --- API de Gastos ---
-export const getExpenses = async (): Promise<Expense[]> => {
-  try {
-    const querySnapshot = await getDocs(collection(db, 'expenses'));
-    const list: Expense[] = [];
-    querySnapshot.forEach((doc) => {
-      list.push(doc.data() as Expense);
-    });
-    return list;
-  } catch (error) {
-    console.error("Error obteniendo gastos:", error);
-    return [];
-  }
-};
-
-export const saveExpense = async (expense: Expense): Promise<void> => {
-  try {
-    await setDoc(doc(db, 'expenses', expense.id), removeUndefined(expense));
-  } catch (error) {
-    console.error("Error guardando gasto:", error);
-    throw error;
-  }
-};
-
-export const deleteExpense = async (id: string): Promise<void> => {
-  try {
-    await deleteDoc(doc(db, 'expenses', id));
-  } catch (error) {
-    console.error("Error eliminando gasto:", error);
-    throw error;
-  }
-};
-
-export const saveExpenses = async (expenses: Expense[]): Promise<void> => {
-  try {
-    for (const expense of expenses) {
-      await saveExpense(expense);
-    }
-  } catch (error) {
-    console.error("Error guardando múltiples gastos:", error);
-  }
-};
+export const getExpenses = () => fetchCollection<Expense>('expenses');
+export const saveExpense = (expense: Expense) => saveDocument('expenses', expense);
+export const deleteExpense = (id: string) => deleteDocument('expenses', id);
+export const saveExpenses = (expenses: Expense[]) => saveManyDocuments('expenses', expenses);
 
 // --- API de Proveedores ---
-export const getSuppliers = async (): Promise<Supplier[]> => {
-  try {
-    const querySnapshot = await getDocs(collection(db, 'suppliers'));
-    const list: Supplier[] = [];
-    querySnapshot.forEach((doc) => {
-      list.push(doc.data() as Supplier);
-    });
-    return list;
-  } catch (error) {
-    console.error("Error obteniendo proveedores:", error);
-    return [];
-  }
-};
-
-export const saveSupplier = async (supplier: Supplier): Promise<void> => {
-  try {
-    await setDoc(doc(db, 'suppliers', supplier.id), removeUndefined(supplier));
-  } catch (error) {
-    console.error("Error guardando proveedor:", error);
-    throw error;
-  }
-};
-
-export const deleteSupplier = async (id: string): Promise<void> => {
-  try {
-    await deleteDoc(doc(db, 'suppliers', id));
-  } catch (error) {
-    console.error("Error eliminando proveedor:", error);
-    throw error;
-  }
-};
-
-export const saveSuppliers = async (suppliers: Supplier[]): Promise<void> => {
-  try {
-    for (const supplier of suppliers) {
-      await saveSupplier(supplier);
-    }
-  } catch (error) {
-    console.error("Error guardando múltiples proveedores:", error);
-  }
-};
+export const getSuppliers = () => fetchCollection<Supplier>('suppliers');
+export const saveSupplier = (supplier: Supplier) => saveDocument('suppliers', supplier);
+export const deleteSupplier = (id: string) => deleteDocument('suppliers', id);
+export const saveSuppliers = (suppliers: Supplier[]) => saveManyDocuments('suppliers', suppliers);
 
 // --- API de Recepciones (Purchases) ---
-export const getPurchases = async (): Promise<Purchase[]> => {
-  try {
-    const querySnapshot = await getDocs(collection(db, 'purchases'));
-    const list: Purchase[] = [];
-    querySnapshot.forEach((doc) => {
-      list.push(doc.data() as Purchase);
-    });
-    return list;
-  } catch (error) {
-    console.error("Error obteniendo recepciones:", error);
-    return [];
-  }
-};
-
-export const savePurchase = async (purchase: Purchase): Promise<void> => {
-  try {
-    await setDoc(doc(db, 'purchases', purchase.id), removeUndefined(purchase));
-  } catch (error) {
-    console.error("Error guardando recepción:", error);
-    throw error;
-  }
-};
-
-export const savePurchases = async (purchases: Purchase[]): Promise<void> => {
-  try {
-    for (const purchase of purchases) {
-      await savePurchase(purchase);
-    }
-  } catch (error) {
-    console.error("Error guardando múltiples recepciones:", error);
-  }
-};
+export const getPurchases = () => fetchCollection<Purchase>('purchases');
+export const savePurchase = (purchase: Purchase) => saveDocument('purchases', purchase);
+export const savePurchases = (purchases: Purchase[]) => saveManyDocuments('purchases', purchases);
 
 // --- API de Metas ---
-export const getGoals = async (): Promise<Goal[]> => {
-  try {
-    const querySnapshot = await getDocs(collection(db, 'goals'));
-    const list: Goal[] = [];
-    querySnapshot.forEach((doc) => {
-      list.push(doc.data() as Goal);
-    });
-    return list;
-  } catch (error) {
-    console.error("Error obteniendo metas:", error);
-    return [];
-  }
-};
+export const getGoals = () => fetchCollection<Goal>('goals');
+export const saveGoal = (goal: Goal) => saveDocument('goals', goal);
+export const saveGoals = (goals: Goal[]) => saveManyDocuments('goals', goals);
 
-export const saveGoal = async (goal: Goal): Promise<void> => {
-  try {
-    await setDoc(doc(db, 'goals', goal.id), removeUndefined(goal));
-  } catch (error) {
-    console.error("Error guardando meta:", error);
-    throw error;
-  }
+// --- API de Cierres de Caja ---
+export const getClosures = async (): Promise<Closure[]> => {
+  const closures = await fetchCollection<Closure>('closures');
+  return closures.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 };
+export const saveClosure = (closure: Closure) => saveDocument('closures', closure);
 
-export const saveGoals = async (goals: Goal[]): Promise<void> => {
-  try {
-    for (const goal of goals) {
-      await saveGoal(goal);
-    }
-  } catch (error) {
-    console.error("Error guardando múltiples metas:", error);
-  }
-};
-
-// --- MIGRACIÓN DE LOCALSTORAGE A FIRESTORE ---
+// --- MIGRACIÓN DE LOCALSTORAGE A SQLITE (Aún útil para primera carga) ---
 
 export const hasLocalData = (): boolean => {
   const keys = [
@@ -317,6 +129,7 @@ export const hasLocalData = (): boolean => {
 };
 
 export const migrateLocalToFirestore = async (): Promise<{ success: boolean; error?: any }> => {
+  // Ahora migraremos a la API Local en lugar de Firestore
   try {
     const keys = [
       { key: 'topfresh_products', collectionName: 'products' },
@@ -333,16 +146,12 @@ export const migrateLocalToFirestore = async (): Promise<{ success: boolean; err
       if (dataStr) {
         const data = JSON.parse(dataStr);
         if (Array.isArray(data) && data.length > 0) {
-          for (const docData of data) {
-            if (docData && docData.id) {
-              await setDoc(doc(db, item.collectionName, docData.id), removeUndefined(docData));
-            }
-          }
+          // Usamos el batch insert que es mucho más rápido
+          await saveManyDocuments(item.collectionName, data);
         }
       }
     }
 
-    // Crear respaldos renombrados y borrar llaves originales para evitar que aparezca de nuevo el banner
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     for (const item of keys) {
       const dataStr = localStorage.getItem(item.key);
@@ -354,39 +163,7 @@ export const migrateLocalToFirestore = async (): Promise<{ success: boolean; err
 
     return { success: true };
   } catch (error) {
-    console.error("Error en migración:", error);
+    console.error("Error en migración a SQLite:", error);
     return { success: false, error };
-  }
-};
-
-export const getClosures = async (): Promise<Closure[]> => {
-  try {
-    const querySnapshot = await getDocs(collection(db, 'closures'));
-    const list: Closure[] = [];
-    querySnapshot.forEach((doc) => {
-      list.push(doc.data() as Closure);
-    });
-    return list.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  } catch (error) {
-    console.error("Error obteniendo cierres de caja:", error);
-    return [];
-  }
-};
-
-export const saveClosure = async (closure: Closure): Promise<void> => {
-  try {
-    await setDoc(doc(db, 'closures', closure.id), removeUndefined(closure));
-  } catch (error) {
-    console.error("Error guardando cierre de caja:", error);
-    throw error;
-  }
-};
-
-export const deleteSale = async (id: string): Promise<void> => {
-  try {
-    await deleteDoc(doc(db, 'sales', id));
-  } catch (error) {
-    console.error("Error eliminando venta:", error);
-    throw error;
   }
 };

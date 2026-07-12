@@ -144,6 +144,21 @@ export default function App() {
         const cleanSales: Sale[] = [];
         const migratedClosures: Closure[] = fetchedClosures.map(mapSaleToClosure);
         
+        // Asignar sequenceNumber a los cierres antiguos para que todos tengan números
+        migratedClosures.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        let nextSeq = 1;
+        migratedClosures.forEach(c => {
+          if (c.sequenceNumber !== undefined) {
+            nextSeq = Math.max(nextSeq, c.sequenceNumber + 1);
+          }
+        });
+        for (const c of migratedClosures) {
+          if (c.sequenceNumber === undefined) {
+            c.sequenceNumber = nextSeq++;
+            saveClosure(c).catch(() => {});
+          }
+        }
+        
         for (const sale of fetchedSales) {
           const isClosure = sale.isCashRegisterClose || sale.items?.some((i: any) => i.productId === 'cash' || i.productId === 'transfer' || i.productName === 'Total Efectivo' || i.productName === 'Total Transferencias');
           if (isClosure) {
@@ -186,9 +201,9 @@ export default function App() {
         setPurchases(fetchedPurchases);
         setGoals(fetchedGoals);
 
-        if (hasLocalData()) {
-          setShowMigrationBanner(true);
-        }
+        // if (hasLocalData()) {
+        //   setShowMigrationBanner(true);
+        // }
       } catch (error) {
         console.error("Error cargando base de datos", error);
       } finally {
