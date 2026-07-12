@@ -324,7 +324,7 @@ export default function Reports({ sales, products, expenses }: ReportsProps) {
   };
 
   return (
-    <div className="flex-1 overflow-y-auto custom-scrollbar p-6 lg:p-8 space-y-6">
+    <div className="flex-1 overflow-y-auto custom-scrollbar p-4 lg:p-6 2xl:p-8 space-y-4 lg:space-y-6">
       
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-2">
         <div>

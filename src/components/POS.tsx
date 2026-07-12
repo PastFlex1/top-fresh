@@ -166,10 +166,10 @@ export default function POS({ products, onCompleteSale, onCompleteClosure, sales
   const total = cart.reduce((sum, item) => sum + item.subtotal, 0);
 
   return (
-    <div className="flex-1 flex overflow-hidden rounded-3xl h-full gap-6">
+    <div className="flex-1 flex overflow-hidden rounded-2xl 2xl:rounded-3xl h-full gap-3 2xl:gap-6">
       {/* Products Section */}
-      <div className="flex-[3] flex flex-col bg-[#fcfaf7] overflow-hidden rounded-3xl border border-[#e8dfd3]">
-        <header className="h-[72px] bg-transparent border-b border-[#e8dfd3] px-6 flex items-center justify-between flex-shrink-0">
+      <div className="flex-[3] flex flex-col bg-[#fcfaf7] overflow-hidden rounded-2xl 2xl:rounded-3xl border border-[#e8dfd3]">
+        <header className="h-14 2xl:h-[72px] bg-transparent border-b border-[#e8dfd3] px-4 2xl:px-6 flex items-center justify-between flex-shrink-0">
           <div className="flex items-center gap-3">
              <div className="w-10 h-10 rounded-full bg-black bg-opacity-5 flex items-center justify-center">
                  <ShoppingCart className="w-5 h-5 text-[#1c1a17]" />
@@ -200,8 +200,8 @@ export default function POS({ products, onCompleteSale, onCompleteClosure, sales
           </div>
         </header>
 
-        <div className="p-6 overflow-y-auto flex-1 custom-scrollbar">
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div className="p-3 2xl:p-6 overflow-y-auto flex-1 custom-scrollbar">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3 2xl:gap-4">
             {filteredProducts.map(product => (
               <ProductCard key={product.id} product={product} onAdd={handleAddToCart} />
             ))}
@@ -215,8 +215,8 @@ export default function POS({ products, onCompleteSale, onCompleteClosure, sales
       </div>
 
       {/* Cart Section */}
-      <div className="w-[300px] lg:w-[340px] bg-[#fcfaf7] flex flex-col rounded-3xl border border-[#e8dfd3] shadow-sm flex-shrink-0 overflow-hidden">
-        <div className="p-5 border-b border-[#e8dfd3] bg-white flex justify-between items-center">
+      <div className="w-[280px] 2xl:w-[340px] bg-[#fcfaf7] flex flex-col rounded-2xl 2xl:rounded-3xl border border-[#e8dfd3] shadow-sm flex-shrink-0 overflow-hidden">
+        <div className="p-4 2xl:p-5 border-b border-[#e8dfd3] bg-white flex justify-between items-center">
           <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-full bg-[#fcaecb] flex items-center justify-center">
                  <ShoppingCart className="w-4 h-4 text-[#be185d]" />
@@ -254,8 +254,8 @@ export default function POS({ products, onCompleteSale, onCompleteClosure, sales
           )}
         </div>
 
-        <div className="p-5 bg-white border-t border-[#e8dfd3]">
-          <div className="mb-4">
+        <div className="p-4 2xl:p-5 bg-white border-t border-[#e8dfd3]">
+          <div className="mb-3 2xl:mb-4">
             <p className="font-medium text-[#878077] text-xs uppercase tracking-wider mb-2">Método de Pago</p>
             <div className="grid grid-cols-2 gap-2">
               <button

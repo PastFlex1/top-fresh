@@ -671,10 +671,10 @@ export default function App() {
   }
 
   return (
-    <div className="bg-[#f0e8dd] text-[#1c1a17] font-sans h-screen w-full flex flex-col overflow-hidden select-none px-6 py-6 font-medium relative">
-      <div className="bg-[#fcfaf7] w-full h-full rounded-[2.5rem] shadow-lg flex flex-col overflow-hidden border border-[#e8dfd3]">
+    <div className="bg-[#f0e8dd] text-[#1c1a17] font-sans h-screen w-full flex flex-col overflow-hidden select-none p-2 sm:p-4 2xl:px-6 2xl:py-6 font-medium relative">
+      <div className="bg-[#fcfaf7] w-full h-full rounded-2xl sm:rounded-3xl 2xl:rounded-[2.5rem] shadow-lg flex flex-col overflow-hidden border border-[#e8dfd3]">
         {/* Top Navbar */}
-        <header className="h-20 px-8 flex items-center justify-between flex-shrink-0">
+        <header className="h-16 2xl:h-20 px-4 2xl:px-8 flex items-center justify-between flex-shrink-0 overflow-x-auto no-scrollbar">
           <div className="flex items-center gap-3">
             <Beef className="w-6 h-6 text-[#1c1a17]" />
             <span className="font-bold tracking-tight text-xl">Top Fresh</span>
@@ -685,7 +685,7 @@ export default function App() {
               <button
                 key={item.id}
                 onClick={() => handleTabChange(item.id)}
-                className={`px-6 py-2 rounded-full text-sm font-semibold transition-all ${
+                className={`px-3 py-1.5 2xl:px-6 2xl:py-2 rounded-full text-xs 2xl:text-sm font-semibold transition-all whitespace-nowrap ${
                   activeTab === item.id 
                     ? 'bg-white shadow-sm text-[#1c1a17]' 
                     : 'text-[#878077] hover:text-[#1c1a17] hover:bg-[#f6f2eb]'
@@ -705,7 +705,7 @@ export default function App() {
         </header>
 
         {/* Main Content */}
-        <main className="flex-1 flex flex-col min-w-0 overflow-hidden bg-[#f8f5f0] rounded-tl-3xl border-t border-l border-[#e8dfd3] p-6 lg:p-8 relative">
+        <main className="flex-1 flex flex-col min-w-0 overflow-hidden bg-[#f8f5f0] rounded-tl-2xl sm:rounded-tl-3xl border-t border-l border-[#e8dfd3] p-3 sm:p-4 2xl:p-6 relative">
           {showMigrationBanner && currentUser?.role === 'Administrador' && (
             <div className="mb-6 p-5 bg-[#fef3c7] border border-[#f59e0b]/30 rounded-3xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm relative overflow-hidden flex-shrink-0">
               <div className="absolute top-0 left-0 h-full w-2 bg-[#f59e0b]" />
