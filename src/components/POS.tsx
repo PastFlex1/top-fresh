@@ -254,13 +254,13 @@ export default function POS({ products, onCompleteSale, onCompleteClosure, sales
           )}
         </div>
 
-        <div className="p-4 2xl:p-5 bg-white border-t border-[#e8dfd3]">
-          <div className="mb-3 2xl:mb-4">
-            <p className="font-medium text-[#878077] text-xs uppercase tracking-wider mb-2">Método de Pago</p>
+        <div className="p-3 2xl:p-5 bg-white border-t border-[#e8dfd3]">
+          <div className="mb-2 2xl:mb-4">
+            <p className="font-medium text-[#878077] text-[10px] 2xl:text-xs uppercase tracking-wider mb-1.5 2xl:mb-2">Método de Pago</p>
             <div className="grid grid-cols-2 gap-2">
               <button
                 onClick={() => setPaymentMethod('Efectivo')}
-                className={`py-2 px-3 rounded-xl border text-sm font-bold flex items-center justify-center gap-2 transition-colors ${
+                className={`py-1.5 2xl:py-2 px-2 2xl:px-3 rounded-xl border text-xs 2xl:text-sm font-bold flex items-center justify-center gap-1.5 2xl:gap-2 transition-colors ${
                   paymentMethod === 'Efectivo' 
                     ? 'border-[#1c1a17] bg-[#1c1a17] text-white' 
                     : 'border-[#e8dfd3] bg-[#fcfaf7] text-[#878077] hover:bg-gray-50'
@@ -271,13 +271,13 @@ export default function POS({ products, onCompleteSale, onCompleteClosure, sales
               </button>
               <button
                 onClick={() => setPaymentMethod('Transferencia')}
-                className={`py-2 px-3 rounded-xl border text-sm font-bold flex items-center justify-center gap-2 transition-colors ${
+                className={`py-1.5 2xl:py-2 px-2 2xl:px-3 rounded-xl border text-xs 2xl:text-sm font-bold flex items-center justify-center gap-1.5 2xl:gap-2 transition-colors ${
                   paymentMethod === 'Transferencia' 
                     ? 'border-[#1c1a17] bg-[#1c1a17] text-white' 
                     : 'border-[#e8dfd3] bg-[#fcfaf7] text-[#878077] hover:bg-gray-50'
                 }`}
               >
-                {paymentMethod === 'Transferencia' && <Check className="w-4 h-4" />}
+                {paymentMethod === 'Transferencia' && <Check className="w-3.5 h-3.5 2xl:w-4 2xl:h-4" />}
                 Transferencia
               </button>
             </div>
@@ -294,25 +294,25 @@ export default function POS({ products, onCompleteSale, onCompleteClosure, sales
             )}
           </div>
           
-          <div className="flex justify-between items-center mb-2">
-            <span className="font-medium text-[#878077] text-xs uppercase tracking-wider">Subtotal</span>
-            <span className="font-bold text-[#878077] text-sm tracking-tight">${total.toFixed(2)}</span>
+          <div className="flex justify-between items-center mb-1 2xl:mb-2 mt-2 2xl:mt-3">
+            <span className="font-medium text-[#878077] text-[10px] 2xl:text-xs uppercase tracking-wider">Subtotal</span>
+            <span className="font-bold text-[#878077] text-xs 2xl:text-sm tracking-tight">${total.toFixed(2)}</span>
           </div>
-          <div className="flex justify-between items-center mb-4 pb-4 border-b border-dashed border-[#e8dfd3]">
-            <span className="font-medium text-[#878077] text-xs uppercase tracking-wider">IVA (0% RIMPE)</span>
-            <span className="font-bold text-[#878077] text-sm tracking-tight">$0.00</span>
+          <div className="flex justify-between items-center mb-2 pb-2 2xl:mb-4 2xl:pb-4 border-b border-dashed border-[#e8dfd3]">
+            <span className="font-medium text-[#878077] text-[10px] 2xl:text-xs uppercase tracking-wider">IVA (0% RIMPE)</span>
+            <span className="font-bold text-[#878077] text-xs 2xl:text-sm tracking-tight">$0.00</span>
           </div>
-          <div className="flex justify-between items-end mb-5">
-            <span className="font-bold text-[#1c1a17] text-sm uppercase tracking-wider">Total a Pagar</span>
-            <span className="font-black text-[#1c1a17] text-3xl tracking-tight leading-none">${total.toFixed(2)}</span>
+          <div className="flex justify-between items-end mb-3 2xl:mb-5">
+            <span className="font-bold text-[#1c1a17] text-xs 2xl:text-sm uppercase tracking-wider">Total a Pagar</span>
+            <span className="font-black text-[#1c1a17] text-2xl 2xl:text-3xl tracking-tight leading-none">${total.toFixed(2)}</span>
           </div>
           
           {paymentMethod === 'Efectivo' && cart.length > 0 && (
-            <div className="bg-[#f0e8dd] rounded-xl p-3 mb-5 border border-[#d7ccc0]">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-bold text-[#878077] uppercase tracking-wider">Monto Recibido</span>
-                <div className="relative w-28">
-                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[#1c1a17] font-bold text-sm">$</span>
+            <div className="bg-[#f0e8dd] rounded-xl p-2.5 2xl:p-3 mb-3 2xl:mb-5 border border-[#d7ccc0]">
+              <div className="flex items-center justify-between mb-1.5 2xl:mb-2">
+                <span className="text-[10px] 2xl:text-xs font-bold text-[#878077] uppercase tracking-wider">Monto Recibido</span>
+                <div className="relative w-24 2xl:w-28">
+                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[#1c1a17] font-bold text-xs 2xl:text-sm">$</span>
                   <input
                     type="number"
                     step="0.01"
@@ -320,13 +320,13 @@ export default function POS({ products, onCompleteSale, onCompleteClosure, sales
                     placeholder="0.00"
                     value={amountReceived}
                     onChange={(e) => setAmountReceived(e.target.value)}
-                    className="w-full bg-white border border-[#e8dfd3] rounded-lg pl-6 pr-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#cbaefc] font-bold text-right"
+                    className="w-full bg-white border border-[#e8dfd3] rounded-lg pl-5 2xl:pl-6 pr-2 py-1 2xl:py-1.5 text-xs 2xl:text-sm focus:outline-none focus:ring-2 focus:ring-[#cbaefc] font-bold text-right"
                   />
                 </div>
               </div>
-              <div className="flex justify-between items-center pt-2 border-t border-[#d7ccc0] border-dashed">
-                <span className="text-xs font-bold text-[#878077] uppercase tracking-wider">Cambio</span>
-                <span className={`font-black text-xl tracking-tight ${
+              <div className="flex justify-between items-center pt-1.5 2xl:pt-2 border-t border-[#d7ccc0] border-dashed">
+                <span className="text-[10px] 2xl:text-xs font-bold text-[#878077] uppercase tracking-wider">Cambio</span>
+                <span className={`font-black text-lg 2xl:text-xl tracking-tight ${
                   (parseFloat(amountReceived) || 0) >= total && amountReceived !== '' ? 'text-green-600' : 'text-[#878077]'
                 }`}>
                   ${Math.max(0, (parseFloat(amountReceived) || 0) - total).toFixed(2)}
@@ -337,7 +337,7 @@ export default function POS({ products, onCompleteSale, onCompleteClosure, sales
           <button
             onClick={handleComplete}
             disabled={cart.length === 0 || (paymentMethod === 'Transferencia' && !receiptNumber.trim())}
-            className="w-full bg-[#1c1a17] hover:bg-black disabled:bg-[#e8dfd3] disabled:text-[#878077] text-white font-bold py-3.5 rounded-2xl flex justify-center items-center gap-2 transition-all active:scale-[0.98] shadow-md text-sm cursor-pointer"
+            className="w-full bg-[#1c1a17] hover:bg-black disabled:bg-[#e8dfd3] disabled:text-[#878077] text-white font-bold py-2.5 2xl:py-3.5 rounded-xl 2xl:rounded-2xl flex justify-center items-center gap-2 transition-all active:scale-[0.98] shadow-md text-xs 2xl:text-sm cursor-pointer"
           >
             <Receipt className="w-5 h-5" />
             FINALIZAR VENTA
