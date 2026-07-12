@@ -104,6 +104,21 @@ export const getClosures = async (): Promise<Closure[]> => {
 };
 export const saveClosure = (closure: Closure) => saveDocument('closures', closure);
 
+// --- API de Sistema ---
+export const clearAllData = async (): Promise<{ success: boolean }> => {
+  try {
+    const response = await fetch(`${API_URL}/system/clear-all`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    if (!response.ok) throw new Error('Failed to clear data');
+    return await response.json();
+  } catch (error) {
+    console.error('Error in clearAllData:', error);
+    throw error;
+  }
+};
+
 // --- MIGRACIÓN DE LOCALSTORAGE A SQLITE (Aún útil para primera carga) ---
 
 export const hasLocalData = (): boolean => {

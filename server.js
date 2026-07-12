@@ -81,6 +81,22 @@ app.post('/api/:collection', (req, res) => {
   }
 });
 
+// POST: Limpiar todo el sistema (borrar todas las tablas)
+app.post('/api/system/clear-all', (req, res) => {
+  try {
+    db.exec('BEGIN TRANSACTION');
+    collections.forEach((collection) => {
+      db.exec(`DELETE FROM ${collection}`);
+    });
+    db.exec('COMMIT');
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error in /api/system/clear-all:', error);
+    db.exec('ROLLBACK');
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
 // DELETE: Eliminar un documento por ID
 app.delete('/api/:collection/:id', (req, res) => {
   const { collection, id } = req.params;

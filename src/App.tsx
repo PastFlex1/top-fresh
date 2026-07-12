@@ -160,7 +160,7 @@ export default function App() {
         }
         
         for (const sale of fetchedSales) {
-          const isClosure = sale.isCashRegisterClose || sale.items?.some((i: any) => i.productId === 'cash' || i.productId === 'transfer' || i.productName === 'Total Efectivo' || i.productName === 'Total Transferencias');
+          const isClosure = sale.items?.some((i: any) => i.productId === 'cash' || i.productId === 'transfer' || i.productName === 'Total Efectivo' || i.productName === 'Total Transferencias');
           if (isClosure) {
             try {
               const mapped = mapSaleToClosure(sale);
